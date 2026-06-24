@@ -247,8 +247,11 @@
     <div class="chips" id="chips"></div>
     <div class="data-tools">
       <button class="dt-btn" id="btnAI" title="AI読み取りの設定（APIキー）">AI設定</button>
+      <button class="dt-btn" id="btnConn" title="チーム同期(Supabase)の接続設定">接続</button>
+      <button class="dt-btn" id="btnSync" title="サーバから最新を取得">最新を取得</button>
       <button class="dt-btn" id="btnBackup" title="全データと書類を1ファイルに保存">バックアップ</button>
       <button class="dt-btn" id="btnRestore" title="バックアップから復元">復元</button>
+      <span class="backup-state" id="syncState"></span>
       <span class="backup-state" id="backupState"></span>
     </div>
     <input type="file" id="restoreInput" accept="application/json,.json" style="display:none">
@@ -329,6 +332,22 @@
   </div>
 </div>
 
+<!-- Supabase connection modal -->
+<div class="modal-bg" id="supaModal">
+  <div class="modal">
+    <div class="modal-head"><h3>チーム同期 接続設定</h3><button class="icon-btn" style="background:#eef0f3;border-color:#dde1e7;color:#5b6776;" id="supaClose">閉じる</button></div>
+    <div class="modal-body">
+      <p>SupabaseのURLとanonキーを入れると、複数PCで同じデータを共有します。値は<b>この端末のブラウザ内だけ</b>に保存され、バックアップには含まれません。</p>
+      <div class="ex-field" style="margin-bottom:10px;"><label>Project URL</label>
+        <input id="supaUrl" placeholder="https://xxxx.supabase.co" style="font-family:'JetBrains Mono',monospace;"></div>
+      <div class="ex-field"><label>anon key</label>
+        <textarea id="supaKey" placeholder="eyJ... または sb_publishable_..." style="border:1px solid var(--line);border-radius:7px;padding:7px 9px;font-family:'JetBrains Mono',monospace;min-height:70px;resize:vertical;"></textarea></div>
+      <p style="font-size:12px;color:#8a94a2;margin-top:10px;">URLとキーを知っていれば誰でも読み書きできます。身内・信頼メンバー限定で。公開リポジトリにキーを直書きしないでください。</p>
+    </div>
+    <div class="modal-foot"><button class="btn-ghost" id="supaClear">接続を解除</button><button class="btn-primary" id="supaSave">保存して接続</button></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -347,8 +366,77 @@
 
   let activeTab="ships", selShip=null, selInv=null, shipFilter="", invFilter="", attachOpen=false;
   const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-  function save(){ if(!store.write(db)) document.getElementById("storageWarn").style.display="block"; }
+  function save(){ if(!store.write(db)) document.getElementById("storageWarn").style.display="block"; scheduleSync(); }
   function esc(v){ return (v==null)?"":String(v).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+  /* ---------- Supabase 同期（接続時のみ動作。未接続ならローカルのまま） ---------- */
+  const SUPA_CFG="cargo-recon-supa";
+  function getSupa(){ try{ return JSON.parse(localStorage.getItem(SUPA_CFG)||"null"); }catch(e){ return null; } }
+  function setSupa(c){ try{ if(c&&c.url&&c.key) localStorage.setItem(SUPA_CFG,JSON.stringify(c)); else localStorage.removeItem(SUPA_CFG); }catch(e){} }
+  function supaOn(){ const c=getSupa(); return !!(c&&c.url&&c.key); }
+  function supaBase(){ return getSupa().url.replace(/\/+$/,""); }
+  function supaH(extra){ const c=getSupa(); return Object.assign({apikey:c.key,Authorization:"Bearer "+c.key},extra||{}); }
+  let syncTimer=null, lastEditTs=0, syncBusy=false;
+
+  function setSyncState(state,msg){
+    const el=document.getElementById("syncState"); if(!el) return;
+    if(!supaOn()){ el.textContent="未接続(この端末のみ)"; el.className="backup-state"; return; }
+    const map={ok:["同期OK",""],saving:["保存中…",""],loading:["取得中…",""],err:["同期エラー","warn"]};
+    const m=map[state]||map.ok; el.textContent="同期: "+m[0]+(msg?("／"+msg):""); el.className="backup-state"+(m[1]?(" "+m[1]):"");
+  }
+  function scheduleSync(){
+    lastEditTs=Date.now();
+    if(!supaOn()) return;
+    setSyncState("saving");
+    clearTimeout(syncTimer);
+    syncTimer=setTimeout(()=>{ supaPushAll().then(()=>setSyncState("ok")).catch(e=>setSyncState("err",e.message)); }, 800);
+  }
+  async function supaPushAll(){
+    if(!supaOn()) return;
+    const now=new Date().toISOString();
+    const rows=shipments.map(s=>({id:s.id,kind:"shipment",data:s,updated_at:now}))
+      .concat(invoices.map(i=>({id:i.id,kind:"invoice",data:i,updated_at:now})));
+    if(!rows.length) return;
+    const r=await fetch(supaBase()+"/rest/v1/cargo_records",{method:"POST",headers:supaH({"Content-Type":"application/json",Prefer:"resolution=merge-duplicates"}),body:JSON.stringify(rows)});
+    if(!r.ok) throw new Error("保存"+r.status);
+  }
+  async function supaDelete(id){ if(!supaOn()) return; try{ await fetch(supaBase()+"/rest/v1/cargo_records?id=eq."+encodeURIComponent(id),{method:"DELETE",headers:supaH()}); }catch(e){} }
+  async function supaPull(){
+    if(!supaOn()) return false;
+    setSyncState("loading");
+    const r=await fetch(supaBase()+"/rest/v1/cargo_records?select=id,kind,data",{headers:supaH()});
+    if(!r.ok){ setSyncState("err","取得"+r.status); return false; }
+    const rows=await r.json();
+    const ships=[], invs=[];
+    rows.forEach(row=>{ if(row.kind==="shipment") ships.push(row.data); else if(row.kind==="invoice") invs.push(row.data); });
+    shipments.length=0; ships.forEach(x=>shipments.push(x)); db.shipments=shipments;
+    invoices.length=0; invs.forEach(x=>invoices.push(x)); db.invoices=invoices;
+    store.write(db); setSyncState("ok"); return true;
+  }
+  // 書類は Storage（バケット cargo-files / public）
+  function supaFileUrl(id){ return supaBase()+"/storage/v1/object/public/cargo-files/att/"+encodeURIComponent(id); }
+  async function supaUpload(id,blob,type){
+    if(!supaOn()) return false;
+    try{ const r=await fetch(supaBase()+"/storage/v1/object/cargo-files/att/"+encodeURIComponent(id),{method:"POST",headers:supaH({"Content-Type":type||"application/octet-stream","x-upsert":"true"}),body:blob}); return r.ok; }
+    catch(e){ return false; }
+  }
+  async function supaFileDelete(id){ if(!supaOn()) return; try{ await fetch(supaBase()+"/storage/v1/object/cargo-files/att/"+encodeURIComponent(id),{method:"DELETE",headers:supaH()}); }catch(e){} }
+  async function getAttachmentBlob(id){
+    try{ const rec=await IDB.get(id); if(rec&&rec.blob) return rec.blob; }catch(e){}
+    if(supaOn()){ try{ const r=await fetch(supaFileUrl(id)); if(r.ok) return await r.blob(); }catch(e){} }
+    return null;
+  }
+  function startAutoPull(){
+    setInterval(()=>{
+      if(!supaOn()||syncBusy) return;
+      const tag=(document.activeElement&&document.activeElement.tagName)||"";
+      if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT") return;   // 入力中は触らない
+      if(Date.now()-lastEditTs<6000) return;                        // 直後の編集は上書きしない
+      if(document.querySelector(".modal-bg.open")) return;          // モーダル中は触らない
+      syncBusy=true;
+      supaPull().then(ok=>{ if(ok) renderAll(); }).catch(()=>{}).finally(()=>{ syncBusy=false; });
+    }, 20000);
+  }
 
   /* ---------- file storage (IndexedDB; large files kept out of localStorage) ---------- */
   const IDB=(function(){
@@ -723,7 +811,7 @@
     if(!confirm("この貨物を削除しますか？（直後なら「元に戻す」で復活できます）")) return;
     const idx=shipments.findIndex(x=>x.id===s.id);
     const removed=shipments.splice(idx,1)[0]; db.shipments=shipments;
-    selShip=null; save(); renderAll();
+    selShip=null; save(); renderAll(); supaDelete(removed.id);
     toast("貨物を削除しました", ()=>{
       shipments.splice(Math.min(idx,shipments.length),0,removed); db.shipments=shipments;
       selShip=removed.id; save(); switchTab("ships"); renderAll(); toast("元に戻しました");
@@ -757,7 +845,7 @@
     linked.forEach(id=>{ const s=shipments.find(x=>x.id===id); if(s){ s.invoiceId=null; touch(s); } });
     const idx=invoices.findIndex(x=>x.id===inv.id);
     const removed=invoices.splice(idx,1)[0]; db.invoices=invoices;
-    selInv=null; save(); renderAll();
+    selInv=null; save(); renderAll(); supaDelete(removed.id);
     toast("請求を削除しました", ()=>{
       invoices.splice(Math.min(idx,invoices.length),0,removed); db.invoices=invoices;
       linked.forEach(id=>{ const s=shipments.find(x=>x.id===id); if(s){ s.invoiceId=removed.id; touch(s); } });
@@ -790,22 +878,26 @@
       const id=uid();
       try{ await IDB.put({id,name:file.name,type:file.type,size:file.size,blob:file}); }
       catch(err){ toast("書類を保存できませんでした（プレビューでは保存不可）"); return; }
-      ent.attachments.push({id,name:file.name,type:file.type||"",size:file.size,addedAt:Date.now()}); n++;
+      let remote=false; try{ remote=await supaUpload(id,file,file.type); }catch(e){}
+      ent.attachments.push({id,name:file.name,type:file.type||"",size:file.size,addedAt:Date.now(),remote:remote}); n++;
     }
     touch(ent); save();
     if(kind==="ship"){ renderShipDetail(); renderShipList(); } else { renderInvDetail(); renderInvList(); }
     toast(n+"件の書類を添付しました");
   }
   async function openFile(id){
-    try{ const rec=await IDB.get(id); if(!rec){ toast("ファイルが見つかりません"); return; }
-      const url=URL.createObjectURL(rec.blob); window.open(url,"_blank"); setTimeout(()=>URL.revokeObjectURL(url),60000);
-    }catch(e){ toast("開けませんでした"); }
+    let blob=null;
+    try{ const rec=await IDB.get(id); if(rec) blob=rec.blob; }catch(e){}
+    if(blob){ const url=URL.createObjectURL(blob); window.open(url,"_blank"); setTimeout(()=>URL.revokeObjectURL(url),60000); return; }
+    if(supaOn()){ window.open(supaFileUrl(id),"_blank"); return; }
+    toast("ファイルが見つかりません");
   }
   async function delFile(kind,id){
     const ent = kind==="ship"?curShip():curInv(); if(!ent) return;
     if(!confirm("この書類を削除します。よろしいですか？")) return;
     ent.attachments=(ent.attachments||[]).filter(f=>f.id!==id); touch(ent); save();
     try{ await IDB.del(id); }catch(e){}
+    supaFileDelete(id);
     if(kind==="ship"){ renderShipDetail(); } else { renderInvDetail(); }
     toast("書類を削除しました");
   }
@@ -919,8 +1011,8 @@ Rules:
     setExBody('<div class="ex-spinner"><span class="spin"></span>AIが書類を読み取っています…</div>');
     setExFoot('<button class="btn-ghost" id="exCancel">キャンセル</button>');
     try{
-      const rec=await IDB.get(fid); if(!rec) throw new Error("ファイルが見つかりません");
-      exState.result=await extractDoc(rec.blob, meta.type||rec.type||"application/pdf");
+      const blob=await getAttachmentBlob(fid); if(!blob) throw new Error("ファイルが見つかりません");
+      exState.result=await extractDoc(blob, meta.type||"application/pdf");
       renderExtractResult();
     }catch(err){
       setExBody('<div class="ex-warn">読み取れませんでした。<br>'+esc(err.message||String(err))+'</div>'
@@ -1141,17 +1233,41 @@ Rules:
     if(e.target.id==="exApply") return applyExtract();
   });
 
-  window.addEventListener("keydown",e=>{ if(e.key==="Escape"){ closeModal(); hideModal("aiModal"); hideModal("extractModal"); } });
+  window.addEventListener("keydown",e=>{ if(e.key==="Escape"){ closeModal(); hideModal("aiModal"); hideModal("extractModal"); hideModal("supaModal"); } });
   window.addEventListener("resize",()=>{ setMobile("ships",!!selShip); setMobile("invoices",!!selInv); });
 
   document.getElementById("btnBackup").addEventListener("click",doBackup);
   document.getElementById("btnRestore").addEventListener("click",()=>document.getElementById("restoreInput").click());
   document.getElementById("restoreInput").addEventListener("change",e=>{ if(e.target.files[0]) doRestore(e.target.files[0]); e.target.value=""; });
 
+  /* Supabase connection */
+  document.getElementById("btnConn").addEventListener("click",()=>{ const c=getSupa()||{}; document.getElementById("supaUrl").value=c.url||""; document.getElementById("supaKey").value=c.key||""; showModal("supaModal"); });
+  document.getElementById("supaClose").addEventListener("click",()=>hideModal("supaModal"));
+  document.getElementById("supaModal").addEventListener("click",e=>{ if(e.target.id==="supaModal") hideModal("supaModal"); });
+  document.getElementById("supaClear").addEventListener("click",()=>{ setSupa(null); hideModal("supaModal"); setSyncState(); toast("接続を解除しました（この端末のみ）"); });
+  document.getElementById("supaSave").addEventListener("click",async()=>{
+    const url=document.getElementById("supaUrl").value.trim().replace(/\/+$/,"");
+    const key=document.getElementById("supaKey").value.trim();
+    if(!url||!key){ toast("URLとキーを入力してください"); return; }
+    setSupa({url,key}); hideModal("supaModal"); setSyncState("loading");
+    try{
+      const peek=await fetch(supaBase()+"/rest/v1/cargo_records?select=id&limit=1",{headers:supaH()});
+      if(!peek.ok) throw new Error("接続"+peek.status);
+      const peekRows=await peek.json();
+      if(peekRows.length===0 && (shipments.length||invoices.length)) await supaPushAll(); // サーバが空ならこの端末のデータで初期化
+      await supaPull(); renderAll();
+      toast("接続しました。複数PCで同期されます");
+    }catch(e){ setSyncState("err",e.message); toast("接続に失敗: "+e.message); }
+  });
+  document.getElementById("btnSync").addEventListener("click",()=>{ if(!supaOn()){ toast("未接続です。『接続』から設定してください"); return; } supaPull().then(ok=>{ if(ok){ renderAll(); toast("最新を取得しました"); } }).catch(e=>toast("取得に失敗: "+e.message)); });
+
   /* boot */
   if(!store.write(db)) document.getElementById("storageWarn").style.display="block";
   renderBackupState();
   renderAll();
+  setSyncState();
+  if(supaOn()){ supaPull().then(ok=>{ if(ok) renderAll(); }).catch(e=>setSyncState("err",e.message)); }
+  startAutoPull();
 })();
 </script>
 </body>
