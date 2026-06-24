@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>貨物照合 — 発注数と到着数の差異チェック / まとめ請求管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#16202e; --ink-soft:#5b6776; --ink-faint:#8a94a2;
+    --paper:#ffffff; --desk:#eceef2; --line:#dde1e7; --line-soft:#eef0f3;
+    --navy:#243b6b; --navy-deep:#1a2c50;
+    --match:#157a54; --match-bg:#e7f4ee;
+    --short:#c0392b; --short-bg:#fcebe9;
+    --over:#b07514; --over-bg:#fbf2e2;
+    --pending:#6b7785; --pending-bg:#eef0f3;
+    --shadow:0 1px 2px rgba(22,32,46,.06), 0 8px 24px rgba(22,32,46,.06);
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{font-family:"Inter","Noto Sans JP",system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--desk);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+  .mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;}
+  button{font-family:inherit;cursor:pointer;}
+  input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
+  input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--navy);outline-offset:1px;}
+
+  /* appbar */
+  .appbar{background:var(--navy-deep);color:#fff;padding:12px 22px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;border-bottom:3px solid var(--navy);}
+  .brand{display:flex;align-items:baseline;gap:11px;}
+  .brand h1{font-family:"Archivo",sans-serif;font-weight:800;font-size:18px;letter-spacing:.06em;margin:0;text-transform:uppercase;}
+  .brand .jp{font-size:12px;color:#a9b6d4;font-weight:500;letter-spacing:.03em;}
+  .tabs{display:flex;gap:6px;background:rgba(255,255,255,.07);padding:4px;border-radius:10px;}
+  .tab{background:transparent;border:none;color:#b9c4dd;font-weight:600;font-size:13px;padding:7px 16px;border-radius:7px;letter-spacing:.03em;}
+  .tab.active{background:#fff;color:var(--navy-deep);}
+  .right{margin-left:auto;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+  .chips{display:flex;gap:9px;flex-wrap:wrap;}
+  .data-tools{display:flex;align-items:center;gap:8px;}
+  .dt-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);color:#fff;border-radius:7px;padding:6px 11px;font-size:12px;font-weight:600;}
+  .dt-btn:hover{background:rgba(255,255,255,.2);}
+  .backup-state{font-size:11px;color:#9fb0d4;font-family:"JetBrains Mono",monospace;white-space:nowrap;}
+  .backup-state.warn{color:#ffc78a;}
+  .chip{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:5px 11px;display:flex;align-items:baseline;gap:6px;}
+  .chip b{font-family:"JetBrains Mono",monospace;font-size:15px;font-weight:700;}
+  .chip span{font-size:11px;color:#a9b6d4;letter-spacing:.03em;}
+  .chip.warn b{color:#ffb4a8;} .chip.warn{border-color:rgba(255,120,100,.35);}
+
+  .storage-warn{background:#fbf2e2;color:#8a5a10;font-size:12px;padding:7px 16px;text-align:center;border-bottom:1px solid #ecd9b0;}
+
+  /* layout */
+  .layout{display:grid;grid-template-columns:340px 1fr;height:calc(100% - 64px);}
+  @media(max-width:880px){.layout{grid-template-columns:1fr;} .list[data-mh="1"]{display:none;} .detail[data-mh="1"]{display:none;}}
+
+  .list{background:var(--paper);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;}
+  .list-head{padding:13px 15px;border-bottom:1px solid var(--line);}
+  .btn-new{width:100%;background:var(--navy);color:#fff;border:none;border-radius:8px;padding:10px;font-weight:600;font-size:14px;}
+  .btn-new:hover{background:var(--navy-deep);}
+  .search{margin-top:9px;width:100%;padding:8px 11px;border:1px solid var(--line);border-radius:8px;background:var(--line-soft);}
+  .cards{overflow-y:auto;flex:1;min-height:0;padding:8px;}
+  .card{border:1px solid var(--line);border-radius:9px;padding:11px 12px;margin-bottom:8px;cursor:pointer;background:#fff;transition:border-color .12s,box-shadow .12s;border-left-width:4px;}
+  .card:hover{border-color:var(--navy);}
+  .card.sel{border-color:var(--navy);box-shadow:var(--shadow);}
+  .card.st-match{border-left-color:var(--match);}
+  .card.st-diff{border-left-color:var(--short);}
+  .card.st-pending,.card.st-empty{border-left-color:var(--pending);}
+  .card.pay-paid{border-left-color:var(--match);}
+  .card.pay-invoiced{border-left-color:var(--over);}
+  .card.pay-overdue{border-left-color:var(--short);}
+  .card-top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .card-key{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:13px;}
+  .card-sub{color:var(--ink-soft);font-size:12px;margin-top:3px;}
+  .card-meta{color:var(--ink-faint);font-size:11px;margin-top:4px;font-family:"JetBrains Mono",monospace;}
+  .badge{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;letter-spacing:.03em;}
+  .badge.match{background:var(--match-bg);color:var(--match);}
+  .badge.diff{background:var(--short-bg);color:var(--short);}
+  .badge.pending,.badge.empty{background:var(--pending-bg);color:var(--pending);}
+  .empty-list{padding:30px 18px;text-align:center;color:var(--ink-faint);font-size:13px;}
+  .tagrow{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+  .tag{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:.03em;white-space:nowrap;}
+  .tag.advance{background:#e7eefb;color:#2a4a8c;}
+  .tag.unbilled{background:var(--pending-bg);color:var(--pending);}
+  .tag.invoiced{background:var(--over-bg);color:var(--over);}
+  .tag.paid{background:var(--match-bg);color:var(--match);}
+  .tag.overdue{background:var(--short-bg);color:var(--short);}
+
+  /* detail */
+  .detail{overflow-y:auto;min-height:0;padding:24px;}
+  .detail-empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--ink-faint);text-align:center;gap:8px;}
+  .detail-empty .big{font-family:"Archivo",sans-serif;font-weight:700;font-size:22px;color:var(--ink-soft);}
+
+  .sheet{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);max-width:1040px;margin:0 auto;overflow:hidden;}
+  .sheet-head{background:var(--navy-deep);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;}
+  .sheet-head .stamp{font-family:"Archivo",sans-serif;font-size:11px;letter-spacing:.18em;color:#9fb0d4;text-transform:uppercase;}
+  .sheet-head .key{font-family:"JetBrains Mono",monospace;font-size:21px;font-weight:700;margin-top:2px;}
+  .sheet-head .tag.advance{background:rgba(120,160,255,.22);color:#cdd9f5;}
+  .sheet-head .tag.unbilled{background:rgba(255,255,255,.14);color:#cfd6df;}
+  .sheet-head .tag.invoiced{background:rgba(255,200,110,.22);color:#ffd89b;}
+  .sheet-head .tag.paid{background:rgba(120,220,170,.2);color:#a9e7c8;}
+  .sheet-head .tag.overdue{background:rgba(255,110,90,.25);color:#ffb4a8;}
+  .head-actions{display:flex;gap:8px;}
+  .icon-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);color:#fff;border-radius:7px;padding:6px 11px;font-size:12px;font-weight:600;}
+  .icon-btn:hover{background:rgba(255,255,255,.2);}
+  .icon-btn.danger:hover{background:#c0392b;border-color:#c0392b;}
+
+  .fields{padding:18px 20px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px 18px;border-bottom:1px solid var(--line-soft);}
+  @media(max-width:680px){.fields{grid-template-columns:1fr 1fr;}}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field.wide{grid-column:1/-1;}
+  .field label{font-size:11px;font-weight:600;color:var(--ink-soft);letter-spacing:.04em;text-transform:uppercase;}
+  .field input,.field select,.field textarea{border:1px solid var(--line);border-radius:7px;padding:8px 10px;background:#fff;width:100%;}
+  .field textarea{resize:vertical;min-height:38px;}
+  .field input.mono{font-weight:600;}
+
+  .section{padding:18px 20px;border-bottom:1px solid var(--line-soft);}
+  .section-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:10px;flex-wrap:wrap;}
+  .section-bar h3{font-family:"Archivo",sans-serif;font-size:14px;letter-spacing:.04em;margin:0;text-transform:uppercase;color:var(--ink);}
+  .mini-btns{display:flex;gap:8px;}
+  .btn-ghost{background:#fff;border:1px solid var(--line);border-radius:7px;padding:7px 12px;font-size:12.5px;font-weight:600;color:var(--navy);}
+  .btn-ghost:hover{background:var(--line-soft);}
+
+  .table-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:9px;}
+  table{border-collapse:collapse;width:100%;min-width:600px;}
+  thead th{background:var(--line-soft);text-align:left;padding:9px 12px;font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid var(--line);white-space:nowrap;}
+  th.num,td.num{text-align:right;}
+  tbody td{padding:7px 10px;border-bottom:1px solid var(--line-soft);vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr.mismatch{background:#fff7f5;}
+  tbody tr.mismatch td:first-child{box-shadow:inset 3px 0 0 var(--short);}
+  td input{border:1px solid transparent;border-radius:6px;padding:6px 8px;width:100%;background:transparent;}
+  td input:hover{border-color:var(--line);}
+  td input:focus{border-color:var(--navy);background:#fff;}
+  td input.name{min-width:150px;}
+  td input.qty{width:88px;text-align:right;font-family:"JetBrains Mono",monospace;font-weight:600;}
+  td input.note{min-width:110px;font-size:13px;}
+  .diff-cell{font-family:"JetBrains Mono",monospace;font-weight:700;white-space:nowrap;}
+  .diff-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:12px;font-weight:700;}
+  .diff-pill.match{background:var(--match-bg);color:var(--match);}
+  .diff-pill.short{background:var(--short-bg);color:var(--short);}
+  .diff-pill.over{background:var(--over-bg);color:var(--over);}
+  .diff-pill.pending{background:var(--pending-bg);color:var(--pending);}
+  .row-del{background:none;border:none;color:var(--ink-faint);font-size:16px;line-height:1;padding:4px 8px;border-radius:6px;}
+  .row-del:hover{color:var(--short);background:var(--short-bg);}
+  .add-row{margin-top:10px;}
+  .add-row button{background:#fff;border:1px dashed var(--line);border-radius:8px;padding:9px;width:100%;color:var(--navy);font-weight:600;font-size:13px;}
+  .add-row button:hover{border-color:var(--navy);background:var(--line-soft);}
+
+  /* attached shipment rows in invoice view */
+  .attached{display:flex;flex-direction:column;gap:8px;}
+  .att-row{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:9px;padding:10px 12px;background:#fff;cursor:pointer;border-left-width:4px;}
+  .att-row:hover{border-color:var(--navy);}
+  .att-row.st-match{border-left-color:var(--match);}
+  .att-row.st-diff{border-left-color:var(--short);}
+  .att-row.st-pending{border-left-color:var(--pending);}
+  .att-main{flex:1;min-width:0;}
+  .att-awb{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:13px;}
+  .att-sub{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+  .att-qty{font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--ink-soft);white-space:nowrap;}
+  .att-empty{color:var(--ink-faint);font-size:13px;padding:14px;text-align:center;border:1px dashed var(--line);border-radius:9px;}
+
+  .attach-panel{margin-top:12px;border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--line-soft);}
+  .attach-panel h4{margin:0 0 10px;font-size:12px;color:var(--ink-soft);letter-spacing:.03em;text-transform:uppercase;}
+  .att-check{display:flex;align-items:center;gap:10px;padding:8px 10px;background:#fff;border:1px solid var(--line);border-radius:8px;margin-bottom:7px;cursor:pointer;}
+  .att-check input{width:16px;height:16px;}
+  .att-check .a-awb{font-family:"JetBrains Mono",monospace;font-weight:600;font-size:13px;}
+  .att-check .a-sub{font-size:12px;color:var(--ink-soft);}
+
+  /* summary */
+  .summary{margin:16px 20px 20px;background:var(--line-soft);border-radius:10px;padding:14px 18px;display:flex;gap:24px;flex-wrap:wrap;align-items:center;}
+  .sum-item{display:flex;flex-direction:column;}
+  .sum-item .lbl{font-size:11px;color:var(--ink-soft);letter-spacing:.04em;text-transform:uppercase;}
+  .sum-item .val{font-family:"JetBrains Mono",monospace;font-size:20px;font-weight:700;}
+  .sum-item .val.short{color:var(--short);} .sum-item .val.over{color:var(--over);} .sum-item .val.match{color:var(--match);}
+  .sum-verdict{margin-left:auto;}
+  .verdict{font-family:"Archivo",sans-serif;font-weight:800;font-size:14px;letter-spacing:.03em;padding:9px 15px;border-radius:8px;text-transform:uppercase;}
+  .verdict.match{background:var(--match-bg);color:var(--match);}
+  .verdict.diff{background:var(--short-bg);color:var(--short);}
+  .verdict.pending,.verdict.empty{background:var(--pending-bg);color:var(--pending);}
+
+  .link-note{font-size:12px;color:var(--ink-soft);margin-top:6px;}
+  .link-note a{color:var(--navy);cursor:pointer;text-decoration:underline;}
+
+  /* modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(22,32,46,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:50;}
+  .modal-bg.open{display:flex;}
+  .modal{background:#fff;border-radius:12px;max-width:560px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+  .modal-head{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;}
+  .modal-head h3{margin:0;font-family:"Archivo",sans-serif;font-size:16px;letter-spacing:.03em;}
+  .modal-body{padding:18px 20px;}
+  .modal-body p{margin:0 0 10px;color:var(--ink-soft);font-size:13px;}
+  .modal-body textarea{width:100%;min-height:150px;border:1px solid var(--line);border-radius:8px;padding:10px;font-family:"JetBrains Mono",monospace;font-size:13px;resize:vertical;}
+  .modal-foot{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px;}
+  .btn-primary{background:var(--navy);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:600;}
+  .btn-primary:hover{background:var(--navy-deep);}
+
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 20px;border-radius:9px;font-size:13px;font-weight:500;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60;box-shadow:var(--shadow);}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .toast-undo{background:#fff;color:var(--ink);border:none;border-radius:6px;padding:4px 11px;font-weight:700;font-size:12px;margin-left:12px;cursor:pointer;}
+
+  /* attachments */
+  .files{display:flex;flex-direction:column;gap:8px;}
+  .file-row{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:9px;padding:9px 12px;background:#fff;}
+  .file-ic{font-family:"Archivo",sans-serif;font-size:10px;font-weight:800;letter-spacing:.06em;color:#fff;background:var(--navy);border-radius:5px;padding:4px 7px;min-width:42px;text-align:center;}
+  .file-ic.img{background:#157a54;} .file-ic.pdf{background:#c0392b;}
+  .file-main{flex:1;min-width:0;}
+  .file-name{font-weight:600;font-size:13px;word-break:break-all;}
+  .file-meta{font-size:11px;color:var(--ink-faint);margin-top:2px;font-family:"JetBrains Mono",monospace;}
+  .file-open{padding:6px 12px;}
+  .upd{font-size:11px;color:#9fb0d4;align-self:center;margin-right:4px;font-family:"JetBrains Mono",monospace;white-space:nowrap;}
+
+  /* AI extraction preview */
+  .ex-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .ex-field{display:flex;flex-direction:column;gap:4px;}
+  .ex-field label{font-size:11px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;}
+  .ex-field input{border:1px solid var(--line);border-radius:7px;padding:7px 9px;width:100%;}
+  .ex-field.conflict input{border-color:var(--short);background:#fff7f5;}
+  .ex-conflict-note{font-size:11px;color:var(--short);font-weight:600;}
+  .ex-items{margin-top:14px;}
+  .ex-item{display:flex;align-items:center;gap:8px;margin-top:6px;}
+  .ex-item input[type=checkbox]{width:16px;height:16px;}
+  .ex-item input[type=text]{flex:1;border:1px solid var(--line);border-radius:6px;padding:6px 8px;}
+  .ex-item input[type=number]{width:92px;border:1px solid var(--line);border-radius:6px;padding:6px 8px;text-align:right;font-family:"JetBrains Mono",monospace;}
+  .ex-opt{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;cursor:pointer;}
+  .ex-opt input{width:16px;height:16px;}
+  .ex-spinner{display:flex;align-items:center;gap:11px;color:var(--ink-soft);padding:14px 0;font-size:14px;}
+  .spin{width:18px;height:18px;border:2px solid var(--line);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .ex-warn{background:var(--short-bg);color:var(--short);border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:10px;}
+  .ex-note{background:var(--over-bg);color:var(--over);border-radius:8px;padding:9px 12px;font-size:12.5px;margin-bottom:10px;font-weight:500;}
+  .file-read{padding:6px 12px;}
+  @media(prefers-reduced-motion:reduce){*{transition:none!important;}}
+</style>
+</head>
+<body>
+
+<div class="appbar">
+  <div class="brand">
+    <h1>Cargo&nbsp;Recon</h1>
+    <span class="jp">貨物照合 × まとめ請求管理</span>
+  </div>
+  <div class="tabs">
+    <button class="tab active" data-tab="ships">貨物</button>
+    <button class="tab" data-tab="invoices">請求</button>
+  </div>
+  <div class="right">
+    <div class="chips" id="chips"></div>
+    <div class="data-tools">
+      <button class="dt-btn" id="btnAI" title="AI読み取りの設定（APIキー）">AI設定</button>
+      <button class="dt-btn" id="btnBackup" title="全データと書類を1ファイルに保存">バックアップ</button>
+      <button class="dt-btn" id="btnRestore" title="バックアップから復元">復元</button>
+      <span class="backup-state" id="backupState"></span>
+    </div>
+    <input type="file" id="restoreInput" accept="application/json,.json" style="display:none">
+  </div>
+</div>
+
+<div id="storageWarn" class="storage-warn" style="display:none;">
+  プレビュー環境のため保存できません。GitHub Pages へ配置するか、ファイルを保存してブラウザで開くと自動保存されます。
+</div>
+
+<!-- ===== SHIPMENTS VIEW ===== -->
+<div class="layout" id="view-ships">
+  <aside class="list" id="shipList">
+    <div class="list-head">
+      <button class="btn-new" id="btnNewShip">＋ 新規 貨物</button>
+      <input class="search" id="shipSearch" placeholder="AWB / 仕入先 / 品名で検索">
+    </div>
+    <div class="cards" id="shipCards"></div>
+  </aside>
+  <section class="detail" id="shipDetailPane">
+    <div class="detail-empty" id="shipEmpty">
+      <div class="big">貨物を選択</div>
+      <div>左から選ぶか、「＋ 新規 貨物」で届いた貨物を登録します。</div>
+    </div>
+    <div id="shipDetail" style="display:none;"></div>
+  </section>
+</div>
+
+<!-- ===== INVOICES VIEW ===== -->
+<div class="layout" id="view-invoices" style="display:none;">
+  <aside class="list" id="invList">
+    <div class="list-head">
+      <button class="btn-new" id="btnNewInv">＋ 新規 請求</button>
+      <input class="search" id="invSearch" placeholder="インボイス番号 / 仕入先で検索">
+    </div>
+    <div class="cards" id="invCards"></div>
+  </aside>
+  <section class="detail" id="invDetailPane">
+    <div class="detail-empty" id="invEmpty">
+      <div class="big">請求を選択</div>
+      <div>まとめ請求書が届いたら「＋ 新規 請求」で作成し、対象の貨物を紐づけます。</div>
+    </div>
+    <div id="invDetail" style="display:none;"></div>
+  </section>
+</div>
+
+<!-- paste import modal -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <div class="modal-head"><h3>明細を貼り付けて取込</h3><button class="icon-btn" style="background:#eef0f3;border-color:#dde1e7;color:#5b6776;" id="modalClose">閉じる</button></div>
+    <div class="modal-body">
+      <p>インボイスから <b>品名</b> と <b>発注数</b> を貼り付けます。1行1品、区切りはタブ・カンマどちらでも可。<br>例：　<span class="mono">Rejuran &nbsp;&nbsp; 50</span></p>
+      <textarea id="pasteArea" placeholder="Jalupro スーパーハイドロ	30&#10;Rejuran	50&#10;LHALA ララパフ	20"></textarea>
+    </div>
+    <div class="modal-foot"><button class="btn-ghost" id="pasteCancel">キャンセル</button><button class="btn-primary" id="pasteApply">取込む</button></div>
+  </div>
+</div>
+
+<!-- AI settings modal -->
+<div class="modal-bg" id="aiModal">
+  <div class="modal">
+    <div class="modal-head"><h3>AI読み取り設定</h3><button class="icon-btn" style="background:#eef0f3;border-color:#dde1e7;color:#5b6776;" id="aiClose">閉じる</button></div>
+    <div class="modal-body">
+      <p>書類をAIで読み取るには Anthropic APIキー が必要です。キーは<b>この端末のブラウザ内だけ</b>に保存され、バックアップには含まれません。（Claude.ai内でこのツールを開いている場合はキー無しで動くことがあります）</p>
+      <input id="aiKeyInput" class="search" placeholder="sk-ant-..." style="font-family:'JetBrains Mono',monospace;margin-top:4px;">
+      <p style="font-size:12px;color:#8a94a2;margin-top:10px;">公開リポジトリや GitHub Pages にキーを直書きしないでください。本番運用ではキーをサーバ側（Supabase Edge Function 等）に置く構成へ移行します。</p>
+    </div>
+    <div class="modal-foot"><button class="btn-ghost" id="aiClear">キーを削除</button><button class="btn-primary" id="aiSave">保存</button></div>
+  </div>
+</div>
+
+<!-- AI extraction preview modal -->
+<div class="modal-bg" id="extractModal">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-head"><h3 id="exTitle">AI読み取り結果</h3><button class="icon-btn" style="background:#eef0f3;border-color:#dde1e7;color:#5b6776;" id="exClose">閉じる</button></div>
+    <div class="modal-body" id="exBody"></div>
+    <div class="modal-foot" id="exFoot"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  const KEY = "cargo-recon-v2";
+
+  /* ---------- storage ---------- */
+  const store = {
+    read(){ try{ const v=localStorage.getItem(KEY); return v?JSON.parse(v):null; }catch(e){ return null; } },
+    write(d){ try{ localStorage.setItem(KEY,JSON.stringify(d)); return true; }catch(e){ return false; } }
+  };
+  let db = store.read() || {shipments:[], invoices:[]};
+  if(!db.shipments) db.shipments=[]; if(!db.invoices) db.invoices=[];
+  const shipments = db.shipments, invoices = db.invoices;
+
+  let activeTab="ships", selShip=null, selInv=null, shipFilter="", invFilter="", attachOpen=false;
+  const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  function save(){ if(!store.write(db)) document.getElementById("storageWarn").style.display="block"; }
+  function esc(v){ return (v==null)?"":String(v).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+  /* ---------- file storage (IndexedDB; large files kept out of localStorage) ---------- */
+  const IDB=(function(){
+    let dbp;
+    function open(){
+      if(dbp) return dbp;
+      dbp=new Promise((res,rej)=>{
+        let r; try{ r=indexedDB.open("cargo-recon-files",1); }catch(e){ return rej(e); }
+        r.onupgradeneeded=()=>{ if(!r.result.objectStoreNames.contains("files")) r.result.createObjectStore("files",{keyPath:"id"}); };
+        r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
+      });
+      return dbp;
+    }
+    function tx(mode){ return open().then(d=>d.transaction("files",mode).objectStore("files")); }
+    return {
+      put:rec=>tx("readwrite").then(s=>new Promise((res,rej)=>{ const q=s.put(rec); q.onsuccess=()=>res(); q.onerror=()=>rej(q.error); })),
+      get:id=>tx("readonly").then(s=>new Promise((res,rej)=>{ const q=s.get(id); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); })),
+      del:id=>tx("readwrite").then(s=>new Promise((res,rej)=>{ const q=s.delete(id); q.onsuccess=()=>res(); q.onerror=()=>rej(q.error); })),
+      all:()=>tx("readonly").then(s=>new Promise((res,rej)=>{ const q=s.getAll(); q.onsuccess=()=>res(q.result||[]); q.onerror=()=>rej(q.error); }))
+    };
+  })();
+
+  /* ---------- format / file helpers ---------- */
+  function pad(n){ return String(n).padStart(2,"0"); }
+  function fmtTime(ts){ if(!ts) return "—"; const d=new Date(ts); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+  function fmtDate(ts){ const d=new Date(ts); return `${d.getMonth()+1}/${pad(d.getDate())}`; }
+  function fmtSize(b){ b=Number(b||0); if(b<1024) return b+" B"; if(b<1048576) return (b/1024).toFixed(0)+" KB"; return (b/1048576).toFixed(1)+" MB"; }
+  function fileIcon(type){ if(/pdf/i.test(type)) return ["pdf","PDF"]; if(/image/i.test(type)) return ["img","IMG"]; return ["","FILE"]; }
+  function blobToB64(blob){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(",")[1]); r.onerror=()=>rej(r.error); r.readAsDataURL(blob); }); }
+  function b64ToBlob(b64,type){ const bin=atob(b64); const arr=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i); return new Blob([arr],{type:type||"application/octet-stream"}); }
+
+  /* ---------- derived ---------- */
+  const STATUS_LABEL={match:"一致",diff:"差異あり",pending:"未確認",empty:"明細なし"};
+  const PAY_LABEL={invoiced:"請求済・未払い",paid:"支払済"};
+
+  function lineDiff(it){ const a=it.arrived; if(a===""||a==null) return null; return Number(a)-Number(it.ordered||0); }
+  function shipStatus(s){
+    if(!s.items.length) return "empty";
+    let pend=false,diff=false;
+    s.items.forEach(it=>{ const d=lineDiff(it); if(d===null)pend=true; else if(d!==0)diff=true; });
+    if(diff) return "diff"; if(pend) return "pending"; return "match";
+  }
+  function shipmentsOf(invId){ return shipments.filter(s=>s.invoiceId===invId); }
+  function invoiceOf(s){ return s.invoiceId ? invoices.find(i=>i.id===s.invoiceId) : null; }
+  function invStatus(inv){
+    const ss=shipmentsOf(inv.id);
+    if(!ss.length) return "empty";
+    let pend=false,diff=false;
+    ss.forEach(s=>{ const st=shipStatus(s); if(st==="diff")diff=true; else if(st==="pending"||st==="empty")pend=true; });
+    if(diff) return "diff"; if(pend) return "pending"; return "match";
+  }
+  function isOverdue(inv){
+    if(!inv.dueDate || inv.payStatus==="paid") return false;
+    const t=new Date(); t.setHours(0,0,0,0);
+    return new Date(inv.dueDate+"T00:00:00") < t;
+  }
+
+  /* ---------- chips (context-sensitive) ---------- */
+  function renderChips(){
+    const el=document.getElementById("chips");
+    if(activeTab==="ships"){
+      const diff=shipments.filter(s=>shipStatus(s)==="diff").length;
+      const pend=shipments.filter(s=>shipStatus(s)==="pending").length;
+      const unbilled=shipments.filter(s=>!s.invoiceId).length;
+      el.innerHTML=`
+        <div class="chip"><b>${shipments.length}</b><span>貨物</span></div>
+        <div class="chip warn"><b>${diff}</b><span>差異あり</span></div>
+        <div class="chip"><b>${pend}</b><span>数量未確認</span></div>
+        <div class="chip warn"><b>${unbilled}</b><span>未請求</span></div>`;
+    }else{
+      const unpaid=invoices.filter(i=>i.payStatus!=="paid").length;
+      const over=invoices.filter(isOverdue).length;
+      const withDiff=invoices.filter(i=>invStatus(i)==="diff").length;
+      el.innerHTML=`
+        <div class="chip"><b>${invoices.length}</b><span>請求</span></div>
+        <div class="chip warn"><b>${unpaid}</b><span>未払い</span></div>
+        <div class="chip warn"><b>${over}</b><span>期限超過</span></div>
+        <div class="chip"><b>${withDiff}</b><span>差異を含む</span></div>`;
+    }
+  }
+
+  /* ---------- shipments list ---------- */
+  function renderShipList(){
+    const wrap=document.getElementById("shipCards");
+    const f=shipFilter.trim().toLowerCase();
+    const rows=shipments.filter(s=>{
+      if(!f) return true;
+      const itemNames=s.items.map(i=>i.name).join(" ");
+      return (s.awbNo+" "+s.supplier+" "+itemNames).toLowerCase().includes(f);
+    }).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+    if(!rows.length){ wrap.innerHTML='<div class="empty-list">'+(shipments.length?"該当なし":"まだ貨物がありません。<br>「＋ 新規 貨物」から登録してください。")+'</div>'; return; }
+    wrap.innerHTML=rows.map(s=>{
+      const st=shipStatus(s);
+      const inv=invoiceOf(s);
+      const title=(s.awbNo?("AWB "+esc(s.awbNo)):"（AWB未入力）");
+      const tags=[];
+      if(s.dealType==="advance") tags.push('<span class="tag advance">先出し</span>');
+      if(!inv) tags.push('<span class="tag unbilled">未請求</span>');
+      else if(isOverdue(inv)) tags.push('<span class="tag overdue">期限超過</span>');
+      else tags.push(`<span class="tag ${inv.payStatus}">${PAY_LABEL[inv.payStatus]}</span>`);
+      return `<div class="card st-${st} ${s.id===selShip?'sel':''}" data-id="${s.id}">
+        <div class="card-top"><span class="card-key">${title}</span><span class="badge ${st}">${STATUS_LABEL[st]}</span></div>
+        <div class="card-sub">${esc(s.supplier)||"仕入先未入力"}</div>
+        <div class="card-meta">${inv?("INV "+esc(inv.invoiceNo||"—")):"請求書 未紐づけ"}　|　${s.items.length}品</div>
+        <div class="tagrow">${tags.join("")}</div>
+      </div>`;
+    }).join("");
+  }
+
+  /* ---------- shipment detail ---------- */
+  function shipDetailHtml(s){
+    const inv=invoiceOf(s);
+    const invOptions=invoices.map(i=>`<option value="${i.id}" ${i.id===s.invoiceId?"selected":""}>INV ${esc(i.invoiceNo||"(無番号)")} — ${esc(i.supplier)||"仕入先?"}</option>`).join("");
+    const st=shipStatus(s);
+    return `
+    <div class="sheet">
+      <div class="sheet-head">
+        <div>
+          <div class="stamp">AWB / 航空運送状</div>
+          <div class="key">${esc(s.awbNo)||"未入力"}</div>
+          <div class="tagrow">
+            ${s.dealType==="advance"?'<span class="tag advance">先出し（後請求）</span>':''}
+            ${inv?(isOverdue(inv)?'<span class="tag overdue">支払期限 超過</span>':`<span class="tag ${inv.payStatus}">${PAY_LABEL[inv.payStatus]}</span>`):'<span class="tag unbilled">未請求</span>'}
+          </div>
+        </div>
+        <div class="head-actions"><span class="upd">更新 ${fmtTime(s.updatedAt)}</span><button class="icon-btn danger" id="btnDelShip">削除</button></div>
+      </div>
+
+      <div class="fields">
+        <div class="field"><label>AWB番号</label><input class="mono f" data-k="awbNo" value="${esc(s.awbNo)}" placeholder="180-12345678"></div>
+        <div class="field"><label>仕入先</label><input class="f" data-k="supplier" value="${esc(s.supplier)}" placeholder="例：VANDS / メーカー名"></div>
+        <div class="field"><label>取引タイプ</label>
+          <select class="f" data-k="dealType">
+            <option value="normal" ${s.dealType!=="advance"?"selected":""}>通常</option>
+            <option value="advance" ${s.dealType==="advance"?"selected":""}>先出し（後でまとめて請求）</option>
+          </select>
+        </div>
+        <div class="field"><label>発注日</label><input type="date" class="f" data-k="orderDate" value="${esc(s.orderDate)}"></div>
+        <div class="field"><label>出荷日</label><input type="date" class="f" data-k="shipDate" value="${esc(s.shipDate)}"></div>
+        <div class="field"><label>到着日</label><input type="date" class="f" data-k="arriveDate" value="${esc(s.arriveDate)}"></div>
+        <div class="field wide"><label>紐づく請求書</label>
+          <select class="f" data-k="invoiceId">
+            <option value="" ${!s.invoiceId?"selected":""}>未請求（請求書まだ）</option>
+            ${invOptions}
+            <option value="__new__">＋ この貨物で新規請求書を作成</option>
+          </select>
+          ${inv?`<div class="link-note">この貨物は <a data-goinv="${inv.id}">INV ${esc(inv.invoiceNo||"(無番号)")}</a> に含まれています。支払い管理は請求タブで。</div>`:''}
+        </div>
+        <div class="field wide"><label>メモ</label><textarea class="f" data-k="note" placeholder="通関・破損・分納などの覚書">${esc(s.note)}</textarea></div>
+      </div>
+
+      <div class="section">
+        <div class="section-bar">
+          <h3>明細 — 発注 × 到着</h3>
+          <div class="mini-btns">
+            <button class="btn-ghost" id="btnPaste">明細を貼付取込</button>
+            <button class="btn-ghost" id="btnShipCsv">CSV出力</button>
+          </div>
+        </div>
+        <div class="table-scroll"><table>
+          <thead><tr><th>品名 / SKU</th><th class="num">発注数</th><th class="num">到着数</th><th>差異</th><th>備考</th><th></th></tr></thead>
+          <tbody id="itemBody">${s.items.map(itemRow).join("")}</tbody>
+        </table></div>
+        <div class="add-row"><button id="btnAddRow">＋ 行を追加</button></div>
+      </div>
+
+      ${filesSection("ship",s)}
+
+      ${shipSummary(s,st)}
+    </div>`;
+  }
+  function itemRow(it){
+    const d=lineDiff(it); let pill;
+    if(d===null) pill='<span class="diff-pill pending">未確認</span>';
+    else if(d===0) pill='<span class="diff-pill match">✓ 一致</span>';
+    else if(d<0) pill=`<span class="diff-pill short">${d} 不足</span>`;
+    else pill=`<span class="diff-pill over">+${d} 過剰</span>`;
+    const mis=(d!==null&&d!==0)?"mismatch":"";
+    return `<tr class="${mis}" data-iid="${it.id}">
+      <td><input class="name it" data-ik="name" value="${esc(it.name)}" placeholder="品名（SKU）"></td>
+      <td class="num"><input class="qty it" data-ik="ordered" inputmode="numeric" value="${esc(it.ordered)}" placeholder="0"></td>
+      <td class="num"><input class="qty it" data-ik="arrived" inputmode="numeric" value="${esc(it.arrived)}" placeholder="—"></td>
+      <td class="diff-cell">${pill}</td>
+      <td><input class="note it" data-ik="note" value="${esc(it.note)}"></td>
+      <td><button class="row-del" title="削除">×</button></td>
+    </tr>`;
+  }
+  function filesSection(kind, ent){
+    const atts=ent.attachments||[];
+    const rows = atts.length ? atts.map(f=>{
+      const [cls,lbl]=fileIcon(f.type);
+      const canAI = /pdf|image/i.test(f.type);
+      return `<div class="file-row" data-fid="${f.id}">
+        <span class="file-ic ${cls}">${lbl}</span>
+        <div class="file-main"><div class="file-name">${esc(f.name)}</div><div class="file-meta">${fmtSize(f.size)}・${fmtTime(f.addedAt)}</div></div>
+        ${canAI?`<button class="btn-ghost file-read" data-fread="${f.id}">AI読取</button>`:''}
+        <button class="btn-ghost file-open" data-fopen="${f.id}">開く</button>
+        <button class="row-del" data-fdel="${f.id}" title="削除">×</button>
+      </div>`;
+    }).join("") : '<div class="att-empty">書類は未添付。インボイス・AWB・パッキングリスト・破損写真・通関書類などを添付できます。</div>';
+    return `<div class="section">
+      <div class="section-bar"><h3>関連書類（${atts.length}）</h3>
+        <div class="mini-btns"><button class="btn-ghost" data-addfile>＋ 書類を添付</button></div>
+      </div>
+      <input type="file" class="file-input" multiple style="display:none">
+      <div class="files">${rows}</div>
+    </div>`;
+  }
+  function shipSummary(s,st){
+    let o=0,a=0,d=0,mm=0;
+    s.items.forEach(it=>{ o+=Number(it.ordered||0); const x=lineDiff(it); if(x!==null){a+=Number(it.arrived||0);d+=x; if(x!==0)mm++;} });
+    return `<div class="summary">
+      <div class="sum-item"><span class="lbl">合計 発注</span><span class="val">${o}</span></div>
+      <div class="sum-item"><span class="lbl">合計 到着</span><span class="val">${a}</span></div>
+      <div class="sum-item"><span class="lbl">差異 合計</span><span class="val ${d<0?'short':d>0?'over':'match'}">${d>0?'+':''}${d}</span></div>
+      <div class="sum-item"><span class="lbl">不一致 行</span><span class="val ${mm?'short':'match'}">${mm}</span></div>
+      <div class="sum-verdict"><span class="verdict ${st}">${st==='match'?'✓ 全数一致':st==='diff'?'⚠ 差異あり':st==='pending'?'… 確認待ち':'明細なし'}</span></div>
+    </div>`;
+  }
+  function renderShipDetail(){
+    const empty=document.getElementById("shipEmpty"), c=document.getElementById("shipDetail");
+    const s=shipments.find(x=>x.id===selShip);
+    if(!s){ empty.style.display="flex"; c.style.display="none"; setMobile("ships",false); return; }
+    empty.style.display="none"; c.style.display="block"; setMobile("ships",true);
+    c.innerHTML=shipDetailHtml(s);
+  }
+
+  /* ---------- invoices list ---------- */
+  function renderInvList(){
+    const wrap=document.getElementById("invCards");
+    const f=invFilter.trim().toLowerCase();
+    const rows=invoices.filter(i=>{ if(!f) return true; return ((i.invoiceNo||"")+" "+(i.supplier||"")).toLowerCase().includes(f); })
+      .sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+    if(!rows.length){ wrap.innerHTML='<div class="empty-list">'+(invoices.length?"該当なし":"まだ請求がありません。<br>まとめ請求書が届いたら作成します。")+'</div>'; return; }
+    wrap.innerHTML=rows.map(i=>{
+      const ss=shipmentsOf(i.id); const qst=invStatus(i); const over=isOverdue(i);
+      const payClass=over?"pay-overdue":(i.payStatus==="paid"?"pay-paid":"pay-invoiced");
+      const tags=[];
+      tags.push(over?'<span class="tag overdue">期限超過</span>':`<span class="tag ${i.payStatus}">${PAY_LABEL[i.payStatus]}</span>`);
+      if(qst==="diff") tags.push('<span class="tag overdue">数量差異</span>');
+      return `<div class="card ${payClass} ${i.id===selInv?'sel':''}" data-id="${i.id}">
+        <div class="card-top"><span class="card-key">INV ${esc(i.invoiceNo)||"(無番号)"}</span><span class="badge ${qst}">${STATUS_LABEL[qst]}</span></div>
+        <div class="card-sub">${esc(i.supplier)||"仕入先未入力"}</div>
+        <div class="card-meta">${ss.length}貨物　|　${i.amount?(esc(i.amount)+" "+esc(i.currency||"")):"金額未入力"}${i.dueDate?("　|　期限 "+esc(i.dueDate)):""}</div>
+        <div class="tagrow">${tags.join("")}</div>
+      </div>`;
+    }).join("");
+  }
+
+  /* ---------- invoice detail ---------- */
+  function invDetailHtml(inv){
+    const ss=shipmentsOf(inv.id);
+    const qst=invStatus(inv); const over=isOverdue(inv);
+    let o=0,a=0,d=0,mm=0;
+    ss.forEach(s=>s.items.forEach(it=>{ o+=Number(it.ordered||0); const x=lineDiff(it); if(x!==null){a+=Number(it.arrived||0);d+=x; if(x!==0)mm++;} }));
+    const attachedHtml = ss.length ? `<div class="attached">${ss.map(s=>{
+        const st=shipStatus(s); let so=0,sa=0; s.items.forEach(it=>{so+=Number(it.ordered||0); if(lineDiff(it)!==null)sa+=Number(it.arrived||0);});
+        return `<div class="att-row st-${st}" data-goship="${s.id}">
+          <div class="att-main"><div class="att-awb">AWB ${esc(s.awbNo)||"—"}</div><div class="att-sub">${esc(s.supplier)||""}　${s.items.length}品　<span class="badge ${st}">${STATUS_LABEL[st]}</span></div></div>
+          <div class="att-qty">発注 ${so} / 到着 ${sa}</div>
+          <button class="row-del" data-detach="${s.id}" title="この請求から外す">×</button>
+        </div>`;
+      }).join("")}</div>` : '<div class="att-empty">まだ貨物が紐づいていません。下のボタンから未請求の貨物を追加します。</div>';
+
+    const unattached=shipments.filter(s=>!s.invoiceId);
+    const attachPanel = attachOpen ? `<div class="attach-panel">
+        <h4>未請求の貨物を選んで紐づけ</h4>
+        ${unattached.length? unattached.map(s=>`<label class="att-check"><input type="checkbox" data-attach="${s.id}">
+            <span><span class="a-awb">AWB ${esc(s.awbNo)||"—"}</span> <span class="a-sub">${esc(s.supplier)||""}・${s.items.length}品</span></span></label>`).join("")
+          : '<div class="att-empty">未請求の貨物はありません。</div>'}
+        ${unattached.length?'<div class="mini-btns" style="margin-top:6px;"><button class="btn-primary" id="btnAttachApply">選択を紐づける</button><button class="btn-ghost" id="btnAttachCancel">閉じる</button></div>':'<div class="mini-btns" style="margin-top:6px;"><button class="btn-ghost" id="btnAttachCancel">閉じる</button></div>'}
+      </div>` : '';
+
+    return `
+    <div class="sheet">
+      <div class="sheet-head">
+        <div>
+          <div class="stamp">Invoice / まとめ請求</div>
+          <div class="key">INV ${esc(inv.invoiceNo)||"(無番号)"}</div>
+          <div class="tagrow">
+            ${over?'<span class="tag overdue">支払期限 超過</span>':`<span class="tag ${inv.payStatus}">${PAY_LABEL[inv.payStatus]}</span>`}
+            ${qst==="diff"?'<span class="tag overdue">数量差異あり</span>':''}
+          </div>
+        </div>
+        <div class="head-actions"><span class="upd">更新 ${fmtTime(inv.updatedAt)}</span><button class="icon-btn danger" id="btnDelInv">削除</button></div>
+      </div>
+
+      <div class="fields">
+        <div class="field"><label>インボイス番号</label><input class="mono fi" data-k="invoiceNo" value="${esc(inv.invoiceNo)}" placeholder="INV-2026-001"></div>
+        <div class="field"><label>仕入先</label><input class="fi" data-k="supplier" value="${esc(inv.supplier)}" placeholder="メーカー名"></div>
+        <div class="field"><label>支払ステータス</label>
+          <select class="fi" data-k="payStatus">
+            <option value="invoiced" ${inv.payStatus!=="paid"?"selected":""}>請求済・未払い</option>
+            <option value="paid" ${inv.payStatus==="paid"?"selected":""}>支払済</option>
+          </select>
+        </div>
+        <div class="field"><label>請求書日付</label><input type="date" class="fi" data-k="invoiceDate" value="${esc(inv.invoiceDate)}"></div>
+        <div class="field"><label>支払期限</label><input type="date" class="fi" data-k="dueDate" value="${esc(inv.dueDate)}"></div>
+        <div class="field"><label>支払日</label><input type="date" class="fi" data-k="paidDate" value="${esc(inv.paidDate)}"></div>
+        <div class="field"><label>請求額（記録のみ／換算なし）</label><input class="mono fi" data-k="amount" inputmode="decimal" value="${esc(inv.amount)}" placeholder="任意"></div>
+        <div class="field"><label>通貨</label><input class="fi" data-k="currency" value="${esc(inv.currency)}" placeholder="USD / KRW / JPY"></div>
+        <div class="field wide"><label>メモ</label><textarea class="fi" data-k="note" placeholder="支払条件・送金メモなど">${esc(inv.note)}</textarea></div>
+      </div>
+
+      <div class="section">
+        <div class="section-bar">
+          <h3>紐づく貨物（${ss.length}）</h3>
+          <div class="mini-btns">
+            <button class="btn-ghost" id="btnAttachOpen">＋ 貨物を紐づけ</button>
+            <button class="btn-ghost" id="btnInvCsv">CSV出力</button>
+          </div>
+        </div>
+        ${attachedHtml}
+        ${attachPanel}
+      </div>
+
+      ${filesSection("inv",inv)}
+
+      <div class="summary">
+        <div class="sum-item"><span class="lbl">合計 発注</span><span class="val">${o}</span></div>
+        <div class="sum-item"><span class="lbl">合計 到着</span><span class="val">${a}</span></div>
+        <div class="sum-item"><span class="lbl">差異 合計</span><span class="val ${d<0?'short':d>0?'over':'match'}">${d>0?'+':''}${d}</span></div>
+        <div class="sum-item"><span class="lbl">不一致 行</span><span class="val ${mm?'short':'match'}">${mm}</span></div>
+        <div class="sum-verdict"><span class="verdict ${qst}">${qst==='match'?'✓ 数量OK 支払可':qst==='diff'?'⚠ 差異あり 要確認':qst==='pending'?'… 数量確認待ち':'貨物未紐づけ'}</span></div>
+      </div>
+    </div>`;
+  }
+  function renderInvDetail(){
+    const empty=document.getElementById("invEmpty"), c=document.getElementById("invDetail");
+    const inv=invoices.find(x=>x.id===selInv);
+    if(!inv){ empty.style.display="flex"; c.style.display="none"; setMobile("invoices",false); return; }
+    empty.style.display="none"; c.style.display="block"; setMobile("invoices",true);
+    c.innerHTML=invDetailHtml(inv);
+  }
+
+  /* ---------- helpers ---------- */
+  function curShip(){ return shipments.find(x=>x.id===selShip); }
+  function curInv(){ return invoices.find(x=>x.id===selInv); }
+  function touch(o){ o.updatedAt=Date.now(); }
+  function setMobile(tab,detailActive){
+    if(window.innerWidth>880) return;
+    const ids = tab==="ships" ? ["shipList","shipDetailPane"] : ["invList","invDetailPane"];
+    document.getElementById(ids[0]).dataset.mh=detailActive?"1":"0";
+    document.getElementById(ids[1]).dataset.mh=detailActive?"0":"1";
+  }
+  let toastTimer;
+  function toast(m, undoFn, ms){
+    const t=document.getElementById("toast");
+    t.innerHTML = esc(m) + (undoFn?' <button class="toast-undo">元に戻す</button>':'');
+    t.classList.add("show");
+    if(undoFn){ t.querySelector(".toast-undo").onclick=()=>{ t.classList.remove("show"); undoFn(); }; }
+    clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"), ms || (undoFn?7000:1900));
+  }
+  function renderAll(){ renderChips(); renderShipList(); renderShipDetail(); renderInvList(); renderInvDetail(); }
+
+  function switchTab(tab){
+    activeTab=tab;
+    document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));
+    document.getElementById("view-ships").style.display = tab==="ships"?"grid":"none";
+    document.getElementById("view-invoices").style.display = tab==="invoices"?"grid":"none";
+    renderChips();
+  }
+
+  /* ---------- shipment actions ---------- */
+  function newShip(){
+    const s={id:uid(),awbNo:"",supplier:"",dealType:"normal",invoiceId:null,orderDate:"",shipDate:"",arriveDate:"",note:"",items:[{id:uid(),name:"",ordered:"",arrived:"",note:""}],attachments:[],updatedAt:Date.now()};
+    shipments.push(s); selShip=s.id; save(); renderAll();
+    const el=document.querySelector('#shipDetail input[data-k="awbNo"]'); if(el) el.focus();
+  }
+  function delShip(){
+    const s=curShip(); if(!s) return;
+    if(!confirm("この貨物を削除しますか？（直後なら「元に戻す」で復活できます）")) return;
+    const idx=shipments.findIndex(x=>x.id===s.id);
+    const removed=shipments.splice(idx,1)[0]; db.shipments=shipments;
+    selShip=null; save(); renderAll();
+    toast("貨物を削除しました", ()=>{
+      shipments.splice(Math.min(idx,shipments.length),0,removed); db.shipments=shipments;
+      selShip=removed.id; save(); switchTab("ships"); renderAll(); toast("元に戻しました");
+    });
+  }
+
+  function addRow(){
+    const s=curShip(); if(!s) return;
+    s.items.push({id:uid(),name:"",ordered:"",arrived:"",note:""}); touch(s); save(); renderShipDetail();
+    const rows=document.querySelectorAll("#itemBody tr"); const last=rows[rows.length-1]; if(last) last.querySelector("input.name").focus();
+  }
+  function shipCsv(){
+    const s=curShip(); if(!s) return;
+    const inv=invoiceOf(s);
+    const head=["AWB","仕入先","取引","インボイス","支払状態","品名","発注数","到着数","差異","数量状態","備考"];
+    const lines=[head];
+    s.items.forEach(it=>{ const d=lineDiff(it); const st=d===null?"未確認":d===0?"一致":d<0?"不足":"過剰";
+      lines.push([s.awbNo,s.supplier,s.dealType==="advance"?"先出し":"通常",inv?inv.invoiceNo:"未請求",inv?PAY_LABEL[inv.payStatus]:"-",it.name,it.ordered,it.arrived,(d===null?"":d),st,it.note]); });
+    downloadCsv(lines, "照合_AWB_"+(s.awbNo||"貨物"));
+  }
+
+  /* ---------- invoice actions ---------- */
+  function newInv(supplier){
+    const i={id:uid(),invoiceNo:"",supplier:supplier||"",payStatus:"invoiced",invoiceDate:"",dueDate:"",paidDate:"",amount:"",currency:"",note:"",attachments:[],updatedAt:Date.now()};
+    invoices.push(i); save(); return i;
+  }
+  function delInv(){
+    const inv=curInv(); if(!inv) return;
+    if(!confirm("この請求を削除しますか？紐づく貨物は『未請求』に戻ります。（直後なら「元に戻す」可）")) return;
+    const linked=shipmentsOf(inv.id).map(s=>s.id);
+    linked.forEach(id=>{ const s=shipments.find(x=>x.id===id); if(s){ s.invoiceId=null; touch(s); } });
+    const idx=invoices.findIndex(x=>x.id===inv.id);
+    const removed=invoices.splice(idx,1)[0]; db.invoices=invoices;
+    selInv=null; save(); renderAll();
+    toast("請求を削除しました", ()=>{
+      invoices.splice(Math.min(idx,invoices.length),0,removed); db.invoices=invoices;
+      linked.forEach(id=>{ const s=shipments.find(x=>x.id===id); if(s){ s.invoiceId=removed.id; touch(s); } });
+      selInv=removed.id; save(); switchTab("invoices"); renderAll(); toast("元に戻しました");
+    });
+  }
+  function invCsv(){
+    const inv=curInv(); if(!inv) return;
+    const ss=shipmentsOf(inv.id);
+    const head=["インボイス","仕入先","支払状態","支払期限","請求額","通貨","AWB","品名","発注数","到着数","差異","数量状態"];
+    const lines=[head];
+    ss.forEach(s=>s.items.forEach(it=>{ const d=lineDiff(it); const st=d===null?"未確認":d===0?"一致":d<0?"不足":"過剰";
+      lines.push([inv.invoiceNo,inv.supplier,PAY_LABEL[inv.payStatus],inv.dueDate,inv.amount,inv.currency,s.awbNo,it.name,it.ordered,it.arrived,(d===null?"":d),st]); }));
+    downloadCsv(lines, "請求_"+(inv.invoiceNo||"INV"));
+  }
+
+  function downloadCsv(lines, name){
+    const csv=lines.map(r=>r.map(c=>{ c=(c==null)?"":String(c); return /[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c; }).join(",")).join("\r\n");
+    const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name.replace(/[^\w\-]/g,"_")+".csv"; a.click(); URL.revokeObjectURL(a.href);
+    toast("CSVを書き出しました");
+  }
+
+  /* ---------- attachments ---------- */
+  async function handleFiles(fileList, kind){
+    const ent = kind==="ship"?curShip():curInv(); if(!ent || !fileList.length) return;
+    if(!ent.attachments) ent.attachments=[];
+    let n=0;
+    for(const file of fileList){
+      const id=uid();
+      try{ await IDB.put({id,name:file.name,type:file.type,size:file.size,blob:file}); }
+      catch(err){ toast("書類を保存できませんでした（プレビューでは保存不可）"); return; }
+      ent.attachments.push({id,name:file.name,type:file.type||"",size:file.size,addedAt:Date.now()}); n++;
+    }
+    touch(ent); save();
+    if(kind==="ship"){ renderShipDetail(); renderShipList(); } else { renderInvDetail(); renderInvList(); }
+    toast(n+"件の書類を添付しました");
+  }
+  async function openFile(id){
+    try{ const rec=await IDB.get(id); if(!rec){ toast("ファイルが見つかりません"); return; }
+      const url=URL.createObjectURL(rec.blob); window.open(url,"_blank"); setTimeout(()=>URL.revokeObjectURL(url),60000);
+    }catch(e){ toast("開けませんでした"); }
+  }
+  async function delFile(kind,id){
+    const ent = kind==="ship"?curShip():curInv(); if(!ent) return;
+    if(!confirm("この書類を削除します。よろしいですか？")) return;
+    ent.attachments=(ent.attachments||[]).filter(f=>f.id!==id); touch(ent); save();
+    try{ await IDB.del(id); }catch(e){}
+    if(kind==="ship"){ renderShipDetail(); } else { renderInvDetail(); }
+    toast("書類を削除しました");
+  }
+
+  /* ---------- backup / restore ---------- */
+  async function doBackup(){
+    let files=[];
+    try{ const recs=await IDB.all(); for(const r of recs){ files.push({id:r.id,name:r.name,type:r.type,size:r.size,dataB64:await blobToB64(r.blob)}); } }
+    catch(e){ /* IndexedDB unavailable — back up data only */ }
+    const payload={app:"cargo-recon",version:2,exportedAt:new Date().toISOString(),db:{shipments,invoices},files};
+    const blob=new Blob([JSON.stringify(payload)],{type:"application/json"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+    a.download="cargo-recon-backup_"+new Date().toISOString().slice(0,10)+".json"; a.click(); URL.revokeObjectURL(a.href);
+    db.lastBackup=Date.now(); save(); renderBackupState();
+    toast("バックアップを書き出しました（書類 "+files.length+"件含む）");
+  }
+  function doRestore(file){
+    const reader=new FileReader();
+    reader.onload=async()=>{
+      let p; try{ p=JSON.parse(reader.result); }catch(e){ toast("ファイルを読み取れませんでした"); return; }
+      if(!p || !p.db){ toast("対応していないバックアップ形式です"); return; }
+      const sc=(p.db.shipments||[]).length, ic=(p.db.invoices||[]).length;
+      if(!confirm(`現在のデータを、このバックアップ（貨物${sc}件・請求${ic}件）で上書きします。よろしいですか？`)) return;
+      shipments.length=0; (p.db.shipments||[]).forEach(x=>shipments.push(x)); db.shipments=shipments;
+      invoices.length=0; (p.db.invoices||[]).forEach(x=>invoices.push(x)); db.invoices=invoices;
+      if(p.db.lastBackup) db.lastBackup=p.db.lastBackup;
+      try{ for(const f of (p.files||[])){ await IDB.put({id:f.id,name:f.name,type:f.type,size:f.size,blob:b64ToBlob(f.dataB64,f.type)}); } }catch(e){}
+      selShip=null; selInv=null; save(); renderAll(); renderBackupState();
+      toast("バックアップから復元しました");
+    };
+    reader.readAsText(file);
+  }
+  function renderBackupState(){
+    const el=document.getElementById("backupState"); if(!el) return;
+    if(!db.lastBackup){ el.textContent="未バックアップ"; el.className="backup-state warn"; return; }
+    const days=Math.floor((Date.now()-db.lastBackup)/86400000);
+    el.textContent="最終BU "+fmtDate(db.lastBackup)+(days>=7?"・要更新":"");
+    el.className="backup-state"+(days>=7?" warn":"");
+  }
+
+  /* ---------- AI document reading (Claude Vision) ---------- */
+  const AIKEY="cargo-recon-aikey";
+  function getKey(){ try{ return localStorage.getItem(AIKEY)||""; }catch(e){ return ""; } }
+  function setKey(k){ try{ if(k) localStorage.setItem(AIKEY,k); else localStorage.removeItem(AIKEY); }catch(e){} }
+
+  const EXTRACT_PROMPT = `You are extracting structured data from an international shipping document (a commercial invoice or an air waybill) used for cargo import reconciliation. These documents come from MANY DIFFERENT suppliers, so layouts, column labels, fonts, languages, and number formats vary widely. Do NOT rely on fixed positions — read the document semantically. Return ONLY a JSON object — no markdown, no code fences, no commentary.
+
+Schema:
+{
+  "docType": "invoice" | "waybill" | "other",
+  "awbNo": string|null,
+  "invoiceNo": string|null,
+  "invoiceDate": string|null,
+  "supplier": string|null,
+  "currency": string|null,
+  "amount": string|null,
+  "pieces": string|null,
+  "weightKg": string|null,
+  "items": [ { "name": string, "ordered": number } ],
+  "warnings": [ string ]
+}
+
+Rules:
+- awbNo: Air Waybill / tracking number, digits only (strip spaces and dashes).
+- invoiceDate: normalise to YYYY-MM-DD regardless of the source format.
+- supplier: the shipper / seller / ship-from company name.
+- currency: 3-letter ISO code (GBP, USD, EUR, KRW, JPY...). Infer from symbols if no code is shown.
+- amount: the grand total invoice amount (or, for a waybill, the declared customs value). Output digits only with a dot decimal and NO thousands separators (e.g. "28250.00"). Handle both 1,234.56 and 1.234,56 styles.
+- items: ONLY commercial-invoice line items; each is one product (description + quantity).
+- "ordered": the number of UNITS for that line (the ordered/shipped piece count) — NOT weight, carton count, pallet count, or unit price.
+- For a waybill, items must be [] (waybills rarely list per-product quantities).
+- Keep product names exactly as written, in their original language.
+- warnings: short notes about anything ambiguous, unclear, partially legible, or guessed (e.g. "QTY column ambiguous", "total partly illegible"). Empty array if fully confident.
+- Use null for any field not present. Never invent values.`;
+
+  async function extractDoc(blob, mediaType){
+    const b64=await blobToB64(blob);
+    const key=getKey();
+    const headers={"content-type":"application/json"};
+    if(key){ headers["x-api-key"]=key; headers["anthropic-version"]="2023-06-01"; headers["anthropic-dangerous-direct-browser-access"]="true"; }
+    const isPdf=/pdf/i.test(mediaType);
+    const source={type:"base64", media_type:isPdf?"application/pdf":(mediaType||"image/png"), data:b64};
+    const docBlock=isPdf?{type:"document",source}:{type:"image",source};
+    const body={model:"claude-sonnet-4-6",max_tokens:4096,messages:[{role:"user",content:[docBlock,{type:"text",text:EXTRACT_PROMPT}]}]};
+    const resp=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers,body:JSON.stringify(body)});
+    if(!resp.ok){ let t=""; try{ t=await resp.text(); }catch(e){} throw new Error("API "+resp.status+(t?(" "+t.slice(0,140)):"")); }
+    const data=await resp.json();
+    const text=(data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n");
+    return parseJsonLoose(text);
+  }
+  function parseJsonLoose(text){
+    let t=String(text||"").replace(/```json|```/g,"").trim();
+    try{ return JSON.parse(t); }catch(e){}
+    const a=t.indexOf("{"), b=t.lastIndexOf("}");
+    if(a>=0 && b>a){ try{ return JSON.parse(t.slice(a,b+1)); }catch(e){} }
+    throw new Error("読み取り結果を解析できませんでした（書類が長すぎる/不鮮明な可能性）");
+  }
+
+  let exState=null;
+  function exEnt(){ if(!exState) return null; return exState.kind==="ship"?shipments.find(x=>x.id===exState.entId):invoices.find(x=>x.id===exState.entId); }
+  function showModal(id){ document.getElementById(id).classList.add("open"); }
+  function hideModal(id){ document.getElementById(id).classList.remove("open"); }
+  function setExBody(h){ document.getElementById("exBody").innerHTML=h; }
+  function setExFoot(h){ document.getElementById("exFoot").innerHTML=h; }
+
+  async function startExtract(kind, fid){
+    const ent = kind==="ship"?curShip():curInv(); if(!ent) return;
+    const meta=(ent.attachments||[]).find(f=>f.id===fid); if(!meta) return;
+    exState={kind, entId:ent.id, fid, result:null};
+    showModal("extractModal");
+    setExBody('<div class="ex-spinner"><span class="spin"></span>AIが書類を読み取っています…</div>');
+    setExFoot('<button class="btn-ghost" id="exCancel">キャンセル</button>');
+    try{
+      const rec=await IDB.get(fid); if(!rec) throw new Error("ファイルが見つかりません");
+      exState.result=await extractDoc(rec.blob, meta.type||rec.type||"application/pdf");
+      renderExtractResult();
+    }catch(err){
+      setExBody('<div class="ex-warn">読み取れませんでした。<br>'+esc(err.message||String(err))+'</div>'
+        +'<p style="font-size:12.5px;color:#5b6776;">APIキーが未設定の可能性があります。上部「AI設定」でキーを登録するか、Claude.ai内でこのツールを開いてお試しください。</p>');
+      setExFoot('<button class="btn-ghost" id="exCancel">閉じる</button>');
+    }
+  }
+
+  function renderExtractResult(){
+    const r=exState.result||{}, kind=exState.kind, ent=exEnt(); if(!ent){ hideModal("extractModal"); return; }
+    const v=x=>x==null?"":x;
+    const exF=(label,id,val,cur)=>{
+      const conflict = cur && String(cur).trim() && val && String(cur).trim()!==String(val).trim();
+      return `<div class="ex-field ${conflict?'conflict':''}"><label>${label}</label>
+        <input type="text" id="${id}" value="${esc(val)}">${conflict?`<div class="ex-conflict-note">⚠ 現在値「${esc(cur)}」と相違</div>`:''}</div>`;
+    };
+    const typeLbl = r.docType==="invoice"?"インボイス":r.docType==="waybill"?"AWB / 貨物状":"書類";
+    const warns=Array.isArray(r.warnings)?r.warnings.filter(Boolean):[];
+    let html = warns.length ? `<div class="ex-note">⚠ AIが要確認とした項目：${warns.map(esc).join(" ／ ")}</div>` : "";
+    html += `<p style="margin:0 0 12px;color:#5b6776;font-size:13px;">種別：<b>${typeLbl}</b>　内容を確認・修正してから反映してください。赤枠は既存値との相違です。</p>`;
+    if(kind==="ship"){
+      const inv=invoiceOf(ent);
+      html+=`<div class="ex-grid">${exF("AWB番号","ex_awb",v(r.awbNo),ent.awbNo)}${exF("仕入先","ex_supplier",v(r.supplier),ent.supplier)}</div>`;
+      const items=Array.isArray(r.items)?r.items:[];
+      html+=`<div class="ex-items"><label style="font-size:11px;font-weight:600;color:#5b6776;text-transform:uppercase;letter-spacing:.04em;">明細（チェックした行を取り込み）</label>`;
+      if(items.length){ items.forEach(it=>{ html+=`<div class="ex-item"><input type="checkbox" checked><input type="text" value="${esc(it.name||'')}"><input type="number" value="${esc(it.ordered!=null?it.ordered:'')}"></div>`; }); }
+      else html+='<div class="att-empty" style="margin-top:6px;">明細は読み取れませんでした（AWBには通常ありません）。</div>';
+      html+=`</div>`;
+      html+=`<div style="margin-top:16px;border-top:1px solid var(--line-soft);padding-top:12px;"><label style="font-size:11px;font-weight:600;color:#5b6776;text-transform:uppercase;letter-spacing:.04em;">請求情報（任意）</label>
+        <div class="ex-grid" style="margin-top:8px;">${exF("インボイス番号","ex_invno",v(r.invoiceNo),inv?inv.invoiceNo:"")}${exF("インボイス日付","ex_invdate",v(r.invoiceDate),inv?inv.invoiceDate:"")}${exF("通貨","ex_cur",v(r.currency),inv?inv.currency:"")}${exF("金額","ex_amt",v(r.amount),inv?inv.amount:"")}</div>
+        <label class="ex-opt"><input type="checkbox" id="ex_makeInv" ${r.invoiceNo?"checked":""}> ${inv?"紐づく請求書も更新する":"請求書も作成して反映する"}</label></div>`;
+    }else{
+      html+=`<div class="ex-grid">${exF("インボイス番号","ex_invno",v(r.invoiceNo),ent.invoiceNo)}${exF("仕入先","ex_supplier",v(r.supplier),ent.supplier)}${exF("インボイス日付","ex_invdate",v(r.invoiceDate),ent.invoiceDate)}${exF("通貨","ex_cur",v(r.currency),ent.currency)}${exF("金額","ex_amt",v(r.amount),ent.amount)}</div>`;
+      if(Array.isArray(r.items)&&r.items.length) html+=`<p style="font-size:12px;color:#8a94a2;margin-top:10px;">※ 明細（${r.items.length}品）は貨物側の「AI読取」で取り込んでください。</p>`;
+    }
+    setExBody(html);
+    setExFoot('<button class="btn-ghost" id="exCancel">キャンセル</button><button class="btn-primary" id="exApply">反映する</button>');
+  }
+
+  function applyExtract(){
+    const kind=exState.kind, ent=exEnt(); if(!ent){ hideModal("extractModal"); return; }
+    const val=id=>{ const e=document.getElementById(id); return e?e.value.trim():""; };
+    if(kind==="ship"){
+      if(val("ex_awb")) ent.awbNo=val("ex_awb");
+      if(val("ex_supplier")) ent.supplier=val("ex_supplier");
+      const items=[];
+      document.querySelectorAll("#exBody .ex-item").forEach(row=>{
+        const ck=row.querySelector('input[type=checkbox]'); if(!ck||!ck.checked) return;
+        const name=row.querySelector('input[type=text]').value.trim();
+        const q=row.querySelector('input[type=number]').value.trim();
+        if(name) items.push({id:uid(),name,ordered:q,arrived:"",note:""});
+      });
+      if(items.length){ const blank=ent.items.every(it=>!it.name&&it.ordered===""&&it.arrived===""); ent.items=blank?items:ent.items.concat(items); }
+      const mk=document.getElementById("ex_makeInv");
+      if(mk&&mk.checked){
+        let inv=invoiceOf(ent); if(!inv){ inv=newInv(ent.supplier); ent.invoiceId=inv.id; }
+        if(val("ex_invno")) inv.invoiceNo=val("ex_invno");
+        if(val("ex_invdate")) inv.invoiceDate=val("ex_invdate");
+        if(val("ex_cur")) inv.currency=val("ex_cur");
+        if(val("ex_amt")) inv.amount=val("ex_amt");
+        if(!inv.supplier&&ent.supplier) inv.supplier=ent.supplier;
+        touch(inv);
+      }
+      touch(ent); save(); renderAll(); hideModal("extractModal"); toast("読み取り内容を反映しました");
+    }else{
+      if(val("ex_invno")) ent.invoiceNo=val("ex_invno");
+      if(val("ex_supplier")) ent.supplier=val("ex_supplier");
+      if(val("ex_invdate")) ent.invoiceDate=val("ex_invdate");
+      if(val("ex_cur")) ent.currency=val("ex_cur");
+      if(val("ex_amt")) ent.amount=val("ex_amt");
+      touch(ent); save(); renderAll(); hideModal("extractModal"); toast("読み取り内容を反映しました");
+    }
+  }
+
+  /* ---------- paste import (shipment items) ---------- */
+  function openModal(){ document.getElementById("pasteArea").value=""; document.getElementById("modalBg").classList.add("open"); document.getElementById("pasteArea").focus(); }
+  function closeModal(){ document.getElementById("modalBg").classList.remove("open"); }
+  function applyPaste(){
+    const s=curShip(); if(!s){ closeModal(); return; }
+    const lines=document.getElementById("pasteArea").value.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+    if(!lines.length){ closeModal(); return; }
+    s.items=s.items.filter(it=>it.name||it.ordered!==""||it.arrived!=="");
+    let added=0;
+    lines.forEach(l=>{ const p=l.split(/\t|,/).map(x=>x.trim()); const name=p[0]||""; if(!name) return;
+      const ordered=(p[1]!==undefined&&p[1]!=="")?p[1].replace(/[^\d.-]/g,""):""; s.items.push({id:uid(),name,ordered,arrived:"",note:""}); added++; });
+    if(!s.items.length) s.items.push({id:uid(),name:"",ordered:"",arrived:"",note:""});
+    touch(s); save(); closeModal(); renderShipDetail(); renderShipList(); renderChips(); toast(added+"品を取り込みました");
+  }
+
+  /* ================= EVENTS ================= */
+  document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));
+  document.getElementById("btnNewShip").addEventListener("click",newShip);
+  document.getElementById("btnNewInv").addEventListener("click",()=>{ const i=newInv(); selInv=i.id; attachOpen=false; renderAll(); const el=document.querySelector('#invDetail input[data-k="invoiceNo"]'); if(el) el.focus(); });
+  document.getElementById("shipSearch").addEventListener("input",e=>{ shipFilter=e.target.value; renderShipList(); });
+  document.getElementById("invSearch").addEventListener("input",e=>{ invFilter=e.target.value; renderInvList(); });
+
+  document.getElementById("shipCards").addEventListener("click",e=>{ const c=e.target.closest(".card"); if(!c) return; selShip=c.dataset.id; renderShipList(); renderShipDetail(); });
+  document.getElementById("invCards").addEventListener("click",e=>{ const c=e.target.closest(".card"); if(!c) return; selInv=c.dataset.id; attachOpen=false; renderInvList(); renderInvDetail(); });
+
+  /* shipment detail: text inputs */
+  document.getElementById("shipDetail").addEventListener("input",e=>{
+    const s=curShip(); if(!s) return;
+    if(e.target.classList.contains("f")){
+      const k=e.target.dataset.k; if(k==="invoiceId") return; // handled on change
+      s[k]=e.target.value; touch(s); save();
+      if(["awbNo","supplier"].includes(k)) renderShipList();
+    }
+    if(e.target.classList.contains("it")){
+      const tr=e.target.closest("tr"); const it=s.items.find(x=>x.id===tr.dataset.iid); if(!it) return;
+      it[e.target.dataset.ik]=e.target.value; touch(s); save();
+      updateShipRow(tr,it); updateShipSummary(s); renderChips(); renderShipList();
+    }
+  });
+  /* shipment detail: selects + dates */
+  document.getElementById("shipDetail").addEventListener("change",e=>{
+    if(e.target.classList.contains("file-input")){ handleFiles(e.target.files,"ship"); e.target.value=""; return; }
+    if(!e.target.classList.contains("f")) return;
+    if(!(e.target.tagName==="SELECT"||e.target.type==="date")) return;
+    const s=curShip(); if(!s) return;
+    const k=e.target.dataset.k;
+    if(k==="invoiceId"){
+      const v=e.target.value;
+      if(v==="__new__"){ const i=newInv(s.supplier); s.invoiceId=i.id; }
+      else s.invoiceId = v || null;
+    }else{ s[k]=e.target.value; }
+    touch(s); save(); renderShipDetail(); renderShipList(); renderInvList(); renderChips();
+  });
+  /* shipment detail: clicks */
+  document.getElementById("shipDetail").addEventListener("click",e=>{
+    if(e.target.id==="btnDelShip") return delShip();
+    if(e.target.id==="btnAddRow") return addRow();
+    if(e.target.id==="btnShipCsv") return shipCsv();
+    if(e.target.id==="btnPaste") return openModal();
+    if(e.target.dataset.addfile!==undefined){ const inp=e.currentTarget.querySelector(".file-input"); if(inp) inp.click(); return; }
+    if(e.target.dataset.fread) return startExtract("ship", e.target.dataset.fread);
+    if(e.target.dataset.fopen) return openFile(e.target.dataset.fopen);
+    if(e.target.dataset.fdel) return delFile("ship", e.target.dataset.fdel);
+    if(e.target.dataset.goinv){ selInv=e.target.dataset.goinv; switchTab("invoices"); renderInvList(); renderInvDetail(); return; }
+    if(e.target.classList.contains("row-del")){
+      const s=curShip(); const tr=e.target.closest("tr");
+      s.items=s.items.filter(x=>x.id!==tr.dataset.iid);
+      if(!s.items.length) s.items.push({id:uid(),name:"",ordered:"",arrived:"",note:""});
+      touch(s); save(); renderShipDetail(); renderShipList(); renderChips();
+    }
+  });
+
+  function updateShipRow(tr,it){
+    const d=lineDiff(it); let pill;
+    if(d===null) pill='<span class="diff-pill pending">未確認</span>';
+    else if(d===0) pill='<span class="diff-pill match">✓ 一致</span>';
+    else if(d<0) pill=`<span class="diff-pill short">${d} 不足</span>`;
+    else pill=`<span class="diff-pill over">+${d} 過剰</span>`;
+    tr.querySelector(".diff-cell").innerHTML=pill; tr.classList.toggle("mismatch",d!==null&&d!==0);
+  }
+  function updateShipSummary(s){
+    let o=0,a=0,d=0,mm=0; s.items.forEach(it=>{ o+=Number(it.ordered||0); const x=lineDiff(it); if(x!==null){a+=Number(it.arrived||0);d+=x; if(x!==0)mm++;} });
+    const st=shipStatus(s); const sum=document.querySelector("#shipDetail .summary"); if(!sum) return;
+    const v=sum.querySelectorAll(".sum-item .val");
+    v[0].textContent=o; v[1].textContent=a;
+    v[2].textContent=(d>0?'+':'')+d; v[2].className="val "+(d<0?'short':d>0?'over':'match');
+    v[3].textContent=mm; v[3].className="val "+(mm?'short':'match');
+    const vd=sum.querySelector(".verdict"); vd.className="verdict "+st;
+    vd.textContent= st==='match'?'✓ 全数一致':st==='diff'?'⚠ 差異あり':st==='pending'?'… 確認待ち':'明細なし';
+  }
+
+  /* invoice detail: text inputs */
+  document.getElementById("invDetail").addEventListener("input",e=>{
+    const inv=curInv(); if(!inv||!e.target.classList.contains("fi")) return;
+    inv[e.target.dataset.k]=e.target.value; touch(inv); save();
+    if(["invoiceNo","supplier","amount","currency"].includes(e.target.dataset.k)) renderInvList();
+  });
+  /* invoice detail: selects + dates */
+  document.getElementById("invDetail").addEventListener("change",e=>{
+    if(e.target.classList.contains("file-input")){ handleFiles(e.target.files,"inv"); e.target.value=""; return; }
+    if(!e.target.classList.contains("fi")) return;
+    if(!(e.target.tagName==="SELECT"||e.target.type==="date")) return;
+    const inv=curInv(); if(!inv) return;
+    inv[e.target.dataset.k]=e.target.value; touch(inv); save();
+    renderInvDetail(); renderInvList(); renderChips(); renderShipList();
+  });
+  /* invoice detail: clicks */
+  document.getElementById("invDetail").addEventListener("click",e=>{
+    if(e.target.id==="btnDelInv") return delInv();
+    if(e.target.id==="btnInvCsv") return invCsv();
+    if(e.target.dataset.addfile!==undefined){ const inp=e.currentTarget.querySelector(".file-input"); if(inp) inp.click(); return; }
+    if(e.target.dataset.fread) return startExtract("inv", e.target.dataset.fread);
+    if(e.target.dataset.fopen) return openFile(e.target.dataset.fopen);
+    if(e.target.dataset.fdel) return delFile("inv", e.target.dataset.fdel);
+    if(e.target.id==="btnAttachOpen"){ attachOpen=true; renderInvDetail(); return; }
+    if(e.target.id==="btnAttachCancel"){ attachOpen=false; renderInvDetail(); return; }
+    if(e.target.id==="btnAttachApply"){
+      const inv=curInv(); const boxes=document.querySelectorAll('#invDetail input[data-attach]:checked');
+      let n=0; boxes.forEach(b=>{ const s=shipments.find(x=>x.id===b.dataset.attach); if(s){ s.invoiceId=inv.id; if(!s.supplier&&inv.supplier)s.supplier=inv.supplier; touch(s); n++; } });
+      attachOpen=false; save(); renderAll(); toast(n+"貨物を紐づけました"); return;
+    }
+    if(e.target.dataset.detach){
+      const s=shipments.find(x=>x.id===e.target.dataset.detach); if(s){ s.invoiceId=null; touch(s); save(); renderInvDetail(); renderInvList(); renderShipList(); renderChips(); }
+      return;
+    }
+    const row=e.target.closest(".att-row");
+    if(row && row.dataset.goship){ selShip=row.dataset.goship; switchTab("ships"); renderShipList(); renderShipDetail(); }
+  });
+
+  /* modal */
+  document.getElementById("modalClose").addEventListener("click",closeModal);
+  document.getElementById("pasteCancel").addEventListener("click",closeModal);
+  document.getElementById("pasteApply").addEventListener("click",applyPaste);
+  document.getElementById("modalBg").addEventListener("click",e=>{ if(e.target.id==="modalBg") closeModal(); });
+
+  /* AI settings + extraction modals */
+  document.getElementById("btnAI").addEventListener("click",()=>{ document.getElementById("aiKeyInput").value=getKey(); showModal("aiModal"); });
+  document.getElementById("aiClose").addEventListener("click",()=>hideModal("aiModal"));
+  document.getElementById("aiSave").addEventListener("click",()=>{ setKey(document.getElementById("aiKeyInput").value.trim()); hideModal("aiModal"); toast("AI設定を保存しました"); });
+  document.getElementById("aiClear").addEventListener("click",()=>{ setKey(""); document.getElementById("aiKeyInput").value=""; toast("キーを削除しました"); });
+  document.getElementById("aiModal").addEventListener("click",e=>{ if(e.target.id==="aiModal") hideModal("aiModal"); });
+  document.getElementById("extractModal").addEventListener("click",e=>{
+    if(e.target.id==="extractModal"||e.target.id==="exClose"||e.target.id==="exCancel") return hideModal("extractModal");
+    if(e.target.id==="exApply") return applyExtract();
+  });
+
+  window.addEventListener("keydown",e=>{ if(e.key==="Escape"){ closeModal(); hideModal("aiModal"); hideModal("extractModal"); } });
+  window.addEventListener("resize",()=>{ setMobile("ships",!!selShip); setMobile("invoices",!!selInv); });
+
+  document.getElementById("btnBackup").addEventListener("click",doBackup);
+  document.getElementById("btnRestore").addEventListener("click",()=>document.getElementById("restoreInput").click());
+  document.getElementById("restoreInput").addEventListener("change",e=>{ if(e.target.files[0]) doRestore(e.target.files[0]); e.target.value=""; });
+
+  /* boot */
+  if(!store.write(db)) document.getElementById("storageWarn").style.display="block";
+  renderBackupState();
+  renderAll();
+})();
+</script>
+</body>
+</html>
