@@ -228,6 +228,28 @@
   @keyframes spin{to{transform:rotate(360deg);}}
   .ex-warn{background:var(--short-bg);color:var(--short);border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:10px;}
   .ex-note{background:var(--over-bg);color:var(--over);border-radius:8px;padding:9px 12px;font-size:12.5px;margin-bottom:10px;font-weight:500;}
+
+  /* report / aggregation */
+  #view-report{padding:22px;overflow:auto;height:calc(100% - 64px);}
+  .report-card{background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);max-width:1120px;margin:0 auto;}
+  .report-head{padding:16px 20px;border-bottom:1px solid var(--line-soft);display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;}
+  .report-head h2{font-family:"Archivo",sans-serif;font-size:16px;margin:0;letter-spacing:.04em;text-transform:uppercase;color:var(--ink);}
+  .report-head .sub{font-size:12px;color:var(--ink-soft);margin-top:3px;}
+  .rep-field{display:flex;flex-direction:column;gap:4px;}
+  .rep-field label{font-size:11px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;}
+  .rep-field select{border:1px solid var(--line);border-radius:7px;padding:7px 10px;background:#fff;min-width:130px;}
+  .rep-spacer{margin-left:auto;}
+  .report-body{padding:16px 20px 22px;}
+  .pivot{border-collapse:collapse;width:100%;min-width:560px;}
+  .pivot th,.pivot td{border-bottom:1px solid var(--line-soft);padding:9px 12px;font-size:13px;white-space:nowrap;}
+  .pivot thead th{background:var(--line-soft);font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.03em;text-align:right;}
+  .pivot th.prod,.pivot td.prod{text-align:left;font-weight:600;}
+  .pivot td{text-align:right;font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums;}
+  .pivot td.prod{font-family:inherit;}
+  .pivot td.z{color:var(--ink-faint);}
+  .pivot th.tot,.pivot td.tot{background:#fbfbfc;font-weight:700;color:var(--navy);}
+  .pivot tfoot td{border-top:2px solid var(--line);background:var(--line-soft);font-weight:700;}
+  .report-empty{padding:40px 18px;text-align:center;color:var(--ink-faint);}
   .file-read{padding:6px 12px;}
   @media(prefers-reduced-motion:reduce){*{transition:none!important;}}
 </style>
@@ -242,6 +264,7 @@
   <div class="tabs">
     <button class="tab active" data-tab="ships">貨物</button>
     <button class="tab" data-tab="invoices">請求</button>
+    <button class="tab" data-tab="report">集計</button>
   </div>
   <div class="right">
     <div class="chips" id="chips"></div>
@@ -297,6 +320,9 @@
     <div id="invDetail" style="display:none;"></div>
   </section>
 </div>
+
+<!-- ===== REPORT VIEW ===== -->
+<div id="view-report" style="display:none;"></div>
 
 <!-- paste import modal -->
 <div class="modal-bg" id="modalBg">
@@ -497,6 +523,14 @@
   /* ---------- chips (context-sensitive) ---------- */
   function renderChips(){
     const el=document.getElementById("chips");
+    if(activeTab==="report"){
+      const r=buildReport();
+      el.innerHTML=`
+        <div class="chip"><b>${r.grand}</b><span>総入庫数</span></div>
+        <div class="chip"><b>${r.products.length}</b><span>商品種類</span></div>
+        <div class="chip"><b>${r.months.filter(m=>m!==r.noDate).length}</b><span>対象月数</span></div>`;
+      return;
+    }
     if(activeTab==="ships"){
       const diff=shipments.filter(s=>shipStatus(s)==="diff").length;
       const pend=shipments.filter(s=>shipStatus(s)==="pending").length;
@@ -790,13 +824,94 @@
     if(undoFn){ t.querySelector(".toast-undo").onclick=()=>{ t.classList.remove("show"); undoFn(); }; }
     clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"), ms || (undoFn?7000:1900));
   }
-  function renderAll(){ renderChips(); renderShipList(); renderShipDetail(); renderInvList(); renderInvDetail(); }
+  function renderAll(){ renderChips(); renderShipList(); renderShipDetail(); renderInvList(); renderInvDetail(); renderReport(); }
+
+  /* ---------- 集計（商品×月の入庫数） ---------- */
+  let reportYear="all", reportSupplier="all", reportMode="arrived";
+  function buildReport(){
+    const noDate="日付未設定";
+    const monthsSet=new Set(), map={}, supSet=new Set(), yearSet=new Set();
+    let grand=0, shipCount=0;
+    shipments.forEach(s=>{
+      if(s.supplier) supSet.add(s.supplier);
+      const m = s.arriveDate ? s.arriveDate.slice(0,7) : noDate;
+      if(m!==noDate) yearSet.add(m.slice(0,4));
+    });
+    shipments.forEach(s=>{
+      if(reportSupplier!=="all" && (s.supplier||"")!==reportSupplier) return;
+      const m = s.arriveDate ? s.arriveDate.slice(0,7) : noDate;
+      if(reportYear!=="all"){ if(m===noDate) return; if(m.slice(0,4)!==reportYear) return; }
+      let any=false;
+      s.items.forEach(it=>{
+        const raw = reportMode==="ordered" ? it.ordered : it.arrived;
+        if(raw===""||raw==null) return;
+        const q=Number(raw)||0; if(!q) return;
+        const name=(it.name||"").trim()||"(無名)";
+        if(!map[name]) map[name]={};
+        map[name][m]=(map[name][m]||0)+q;
+        grand+=q; any=true; monthsSet.add(m);
+      });
+      if(any) shipCount++;
+    });
+    const months=[...monthsSet].filter(x=>x!==noDate).sort();
+    if(monthsSet.has(noDate)) months.push(noDate);
+    const products=Object.keys(map).sort();
+    return {months,products,map,grand,shipCount,suppliers:[...supSet].sort(),years:[...yearSet].sort().reverse(),noDate};
+  }
+  function renderReport(){
+    const el=document.getElementById("view-report"); if(!el) return;
+    const r=buildReport();
+    const yearOpts=`<option value="all">すべて</option>`+r.years.map(y=>`<option value="${y}" ${reportYear===y?"selected":""}>${y}年</option>`).join("");
+    const supOpts=`<option value="all">すべて</option>`+r.suppliers.map(s=>`<option value="${esc(s)}" ${reportSupplier===s?"selected":""}>${esc(s)}</option>`).join("");
+    const modeLabel = reportMode==="ordered"?"発注数":"入庫数（到着）";
+    let body;
+    if(!r.products.length){
+      body=`<div class="report-empty">対象データがありません。<br>貨物に「到着数」と「到着日」を入れると、ここに月別の入庫集計が出ます。</div>`;
+    }else{
+      const colTotals={}; r.months.forEach(m=>colTotals[m]=0);
+      const rows=r.products.map(p=>{
+        let rowTotal=0;
+        const tds=r.months.map(m=>{ const q=r.map[p][m]||0; rowTotal+=q; colTotals[m]+=q; return `<td class="${q?'':'z'}">${q||"–"}</td>`; }).join("");
+        return `<tr><td class="prod">${esc(p)}</td>${tds}<td class="tot">${rowTotal}</td></tr>`;
+      }).join("");
+      const footCells=r.months.map(m=>`<td>${colTotals[m]}</td>`).join("");
+      body=`<div class="table-scroll" style="border:none;"><table class="pivot">
+        <thead><tr><th class="prod">商品</th>${r.months.map(m=>`<th>${m===r.noDate?m:esc(m)}</th>`).join("")}<th class="tot">合計</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><td class="prod">月合計</td>${footCells}<td class="tot">${r.grand}</td></tr></tfoot>
+      </table></div>`;
+    }
+    el.innerHTML=`<div class="report-card">
+      <div class="report-head">
+        <div><h2>入庫集計</h2><div class="sub">${modeLabel}を「到着日の月」で集計。商品名ごとに合算します。</div></div>
+        <div class="rep-field"><label>集計対象</label>
+          <select id="repMode"><option value="arrived" ${reportMode==="arrived"?"selected":""}>入庫数（到着）</option><option value="ordered" ${reportMode==="ordered"?"selected":""}>発注数</option></select></div>
+        <div class="rep-field"><label>年</label><select id="repYear">${yearOpts}</select></div>
+        <div class="rep-field"><label>仕入先</label><select id="repSup">${supOpts}</select></div>
+        <div class="rep-spacer"></div>
+        <div class="rep-field"><label>&nbsp;</label><button class="btn-ghost" id="repCsv">CSV出力</button></div>
+      </div>
+      <div class="report-body">${body}</div>
+    </div>`;
+  }
+  function reportCsv(){
+    const r=buildReport();
+    if(!r.products.length){ toast("出力するデータがありません"); return; }
+    const head=["商品",...r.months,"合計"];
+    const lines=[head];
+    r.products.forEach(p=>{ let t=0; const row=[p]; r.months.forEach(m=>{ const q=r.map[p][m]||0; t+=q; row.push(q); }); row.push(t); lines.push(row); });
+    const footer=["月合計"]; r.months.forEach(m=>{ let c=0; r.products.forEach(p=>c+=(r.map[p][m]||0)); footer.push(c); }); footer.push(r.grand);
+    lines.push(footer);
+    downloadCsv(lines, "入庫集計_"+(reportMode==="ordered"?"発注":"入庫")+"_"+(reportYear==="all"?"全期間":reportYear));
+  }
 
   function switchTab(tab){
     activeTab=tab;
     document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));
     document.getElementById("view-ships").style.display = tab==="ships"?"grid":"none";
     document.getElementById("view-invoices").style.display = tab==="invoices"?"grid":"none";
+    document.getElementById("view-report").style.display = tab==="report"?"block":"none";
+    if(tab==="report") renderReport();
     renderChips();
   }
 
@@ -1260,6 +1375,16 @@ Rules:
     }catch(e){ setSyncState("err",e.message); toast("接続に失敗: "+e.message); }
   });
   document.getElementById("btnSync").addEventListener("click",()=>{ if(!supaOn()){ toast("未接続です。『接続』から設定してください"); return; } supaPull().then(ok=>{ if(ok){ renderAll(); toast("最新を取得しました"); } }).catch(e=>toast("取得に失敗: "+e.message)); });
+
+  /* report view controls */
+  document.getElementById("view-report").addEventListener("change",e=>{
+    if(e.target.id==="repMode") reportMode=e.target.value;
+    else if(e.target.id==="repYear") reportYear=e.target.value;
+    else if(e.target.id==="repSup") reportSupplier=e.target.value;
+    else return;
+    renderReport(); renderChips();
+  });
+  document.getElementById("view-report").addEventListener("click",e=>{ if(e.target.id==="repCsv") reportCsv(); });
 
   /* boot */
   if(!store.write(db)) document.getElementById("storageWarn").style.display="block";
