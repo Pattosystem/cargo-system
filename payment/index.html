@@ -33,6 +33,9 @@
   .brand .jp{font-size:12px;color:#9ec9bb;font-weight:500;letter-spacing:.03em;}
   .xlink{color:#9ec9bb;text-decoration:none;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,.18);border-radius:7px;padding:6px 11px;}
   .xlink:hover{background:rgba(255,255,255,.1);color:#fff;}
+  .navset{display:flex;gap:6px;}
+  .xlink.cur{background:rgba(255,255,255,.16);color:#fff;cursor:default;}
+  .xlink.cur:hover{background:rgba(255,255,255,.16);}
   .chips{display:flex;gap:9px;flex-wrap:wrap;}
   .chip{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:5px 11px;display:flex;align-items:baseline;gap:6px;}
   .chip b{font-family:"JetBrains Mono",monospace;font-size:15px;font-weight:700;}
@@ -198,7 +201,11 @@
     <h1>Payments</h1>
     <span class="jp">支払管理 — 送金・予定・書類</span>
   </div>
-  <a class="xlink" href="../">← 貨物照合へ</a>
+  <div class="navset">
+    <a class="xlink" href="../">貨物照合</a>
+    <span class="xlink cur">支払管理</span>
+    <a class="xlink" href="../pricing/">仕入価格</a>
+  </div>
   <div class="right">
     <div class="chips" id="chips"></div>
     <div class="data-tools">
