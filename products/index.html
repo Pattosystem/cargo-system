@@ -130,6 +130,18 @@
   .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 20px;border-radius:9px;font-size:13px;font-weight:500;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60;box-shadow:var(--shadow);}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
   .toast-undo{background:#fff;color:var(--ink);border:none;border-radius:6px;padding:4px 11px;font-weight:700;font-size:12px;margin-left:12px;cursor:pointer;}
+  .ex-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .ex-field{display:flex;flex-direction:column;gap:4px;}
+  .ex-field.full{grid-column:1/-1;}
+  .ex-field label{font-size:11px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:6px;}
+  .ex-field input{border:1px solid var(--line);border-radius:7px;padding:7px 9px;width:100%;}
+  .ex-field.conflict input{border-color:#c0392b;background:#fff7f5;}
+  .ex-cn{font-size:11px;color:#c0392b;font-weight:600;}
+  .ex-spinner{display:flex;align-items:center;gap:11px;color:var(--ink-soft);padding:14px 0;font-size:14px;}
+  .spin{width:18px;height:18px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .ex-warn{background:#fcebe9;color:#c0392b;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:10px;}
+  .ex-note{background:var(--gold-bg);color:var(--gold);border-radius:8px;padding:9px 12px;font-size:12.5px;margin-bottom:10px;font-weight:500;}
   @media(prefers-reduced-motion:reduce){*{transition:none!important;}}
 </style>
 </head>
@@ -145,6 +157,7 @@
   </div>
   <div class="right">
     <div class="data-tools">
+      <button class="dt-btn" id="btnAI" title="AI読み取りの設定（APIキー）">AI設定</button>
       <button class="dt-btn" id="btnLabels" title="書類の種別を管理">種別管理</button>
       <button class="dt-btn" id="btnConn" title="チーム同期(Supabase)の接続設定">接続</button>
       <button class="dt-btn" id="btnSync" title="サーバから最新を取得">最新を取得</button>
@@ -182,6 +195,27 @@
       <div class="modal-field"><label>anon key</label><textarea id="supaKey" placeholder="eyJ... または sb_publishable_..." style="font-family:'JetBrains Mono',monospace;min-height:64px;resize:vertical;"></textarea></div>
     </div>
     <div class="modal-foot"><button class="btn-ghost" id="supaClear">接続を解除</button><button class="btn-primary" id="supaSave">保存して接続</button></div>
+  </div>
+</div>
+
+<!-- AI settings modal -->
+<div class="modal-bg" id="aiModal">
+  <div class="modal">
+    <div class="modal-head"><h3>AI読み取り設定</h3><button class="icon-btn" style="background:#eef2ef;border-color:#dbe3de;color:#5b6b63;" id="aiClose">閉じる</button></div>
+    <div class="modal-body">
+      <p>カタログをAIで読み取るには Anthropic APIキー が必要です。キーは<b>この端末のブラウザ内だけ</b>に保存されます。他アプリと同じ <b>sk-ant-</b> キーでOK（各アプリで別保存）。</p>
+      <input id="aiKeyInput" placeholder="sk-ant-..." style="font-family:'JetBrains Mono',monospace;">
+    </div>
+    <div class="modal-foot"><button class="btn-ghost" id="aiClear">キーを削除</button><button class="btn-primary" id="aiSave">保存</button></div>
+  </div>
+</div>
+
+<!-- AI extraction preview modal -->
+<div class="modal-bg" id="extractModal">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-head"><h3>カタログ読み取り結果</h3><button class="icon-btn" style="background:#eef2ef;border-color:#dbe3de;color:#5b6b63;" id="exClose">閉じる</button></div>
+    <div class="modal-body" id="exBody"></div>
+    <div class="modal-foot" id="exFoot"></div>
   </div>
 </div>
 
@@ -336,11 +370,12 @@
       </div>
     </div>`;
   }
-  function docRow(d){ const [cls,lbl]=fileIcon(d.type);
+  function docRow(d){ const [cls,lbl]=fileIcon(d.type); const canAI=/pdf|image/i.test(d.type);
     return `<div class="file-row" data-fid="${d.id}">
       <span class="file-ic ${cls}">${lbl}</span>
       <div class="file-main"><div class="file-name">${esc(d.name)}</div><div class="file-meta">${fmtSize(d.size)}・${fmtTime(d.addedAt)}</div></div>
       <select class="doc-label" data-fid="${d.id}">${docLabelOptions(d.label||"その他")}</select>
+      ${canAI?`<button class="btn-ghost" data-fread="${d.id}">AI読取</button>`:''}
       <button class="btn-ghost" data-fopen="${d.id}">開く</button>
       <button class="row-del" data-fdel="${d.id}" title="削除">×</button>
     </div>`; }
@@ -390,6 +425,95 @@
     <input class="lbl-name" data-i="${i}" value="${esc(l)}"><button class="btn-ghost lbl-up" data-i="${i}" ${i===0?'disabled':''}>↑</button>
     <button class="row-del lbl-del" data-i="${i}">×</button></div>`).join(""); }
 
+  /* ---- AI 読み取り（カタログ → 商品情報） ---- */
+  const AIKEY="products-aikey";
+  function getKey(){ try{ return localStorage.getItem(AIKEY)||""; }catch(e){ return ""; } }
+  function setKey(k){ try{ if(k) localStorage.setItem(AIKEY,k); else localStorage.removeItem(AIKEY); }catch(e){} }
+  const CATALOG_PROMPT=`You are reading a product catalog / brochure / spec sheet for an aesthetic-medicine product (filler, toxin, skin booster, thread, device, cosmetic, etc.), to register it in a product master. Layouts and languages vary (English, Korean, Japanese). Read semantically. Return ONLY a JSON object — no markdown, no code fences, no commentary.
+
+Schema:
+{
+  "name": string|null,
+  "name_en": string|null,
+  "maker": string|null,
+  "origin": string|null,
+  "category": string|null,
+  "tags": [ string ],
+  "warnings": [ string ]
+}
+
+Rules:
+- name: the product's primary name (in Japanese if the catalog shows one, otherwise its main name).
+- name_en: the English/Latin product name if present.
+- maker: manufacturer / brand company.
+- origin: country of origin / manufacture (e.g. 韓国, Korea).
+- category: a short product category (e.g. ボツリヌストキシン, ヒアルロン酸フィラー, スキンブースター, スレッド, 医療機器, 化粧品).
+- tags: up to 5 short keywords describing key features/indications (e.g. リフト, 保湿, PDRN, 高分子). 
+- Do NOT write a description or memo. Use null / [] when unknown. Never invent.
+- warnings: anything ambiguous. Empty array if confident.`;
+
+  async function extractCatalog(blob,mediaType){
+    const b64=await blobToB64(blob); const key=getKey();
+    const headers={"content-type":"application/json"};
+    if(key){ headers["x-api-key"]=key; headers["anthropic-version"]="2023-06-01"; headers["anthropic-dangerous-direct-browser-access"]="true"; }
+    const isPdf=/pdf/i.test(mediaType);
+    const source={type:"base64",media_type:isPdf?"application/pdf":(mediaType||"image/png"),data:b64};
+    const docBlock=isPdf?{type:"document",source}:{type:"image",source};
+    const body={model:"claude-sonnet-4-6",max_tokens:2048,messages:[{role:"user",content:[docBlock,{type:"text",text:CATALOG_PROMPT}]}]};
+    const resp=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers,body:JSON.stringify(body)});
+    if(!resp.ok){ let t=""; try{ t=await resp.text(); }catch(e){} throw new Error("API "+resp.status+(t?(" "+t.slice(0,140)):"")); }
+    const data=await resp.json(); const text=(data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n");
+    return parseJsonLoose(text);
+  }
+  function parseJsonLoose(text){ let t=String(text||"").replace(/```json|```/g,"").trim();
+    try{ return JSON.parse(t); }catch(e){} const a=t.indexOf("{"),b=t.lastIndexOf("}");
+    if(a>=0&&b>a){ try{ return JSON.parse(t.slice(a,b+1)); }catch(e){} }
+    throw new Error("読み取り結果を解析できませんでした"); }
+
+  let exState=null;
+  function setExBody(h){ document.getElementById("exBody").innerHTML=h; }
+  function setExFoot(h){ document.getElementById("exFoot").innerHTML=h; }
+  async function startExtract(fid){
+    const p=cur(); if(!p) return; const d=(p.documents||[]).find(x=>x.id===fid); if(!d) return;
+    exState={id:p.id,fid,result:null}; showModal("extractModal");
+    setExBody('<div class="ex-spinner"><span class="spin"></span>AIがカタログを読み取っています…</div>');
+    setExFoot('<button class="btn-ghost" id="exCancel">キャンセル</button>');
+    try{ const blob=await getDocBlob(d); if(!blob) throw new Error("ファイルが見つかりません");
+      exState.result=await extractCatalog(blob,d.type||"application/pdf"); renderExtract(); }
+    catch(err){ setExBody('<div class="ex-warn">読み取れませんでした。<br>'+esc(err.message||String(err))+'</div><p style="font-size:12.5px;color:#5b6b63;">APIキーが未設定/誤りの可能性。上部「AI設定」で <b>sk-ant-</b> キーを登録してください。</p>');
+      setExFoot('<button class="btn-ghost" id="exCancel">閉じる</button>'); }
+  }
+  function renderExtract(){
+    const r=exState.result||{}, p=items.find(x=>x.id===exState.id); if(!p){ hideModal("extractModal"); return; }
+    const v=x=>x==null?"":x;
+    const fld=(label,id,val,curv,full)=>{ const conflict=curv&&String(curv).trim()&&val&&String(curv).trim()!==String(val).trim();
+      return `<div class="ex-field ${full?'full':''} ${conflict?'conflict':''}"><label><input type="checkbox" id="ck_${id}" checked> ${label}</label>
+        <input type="text" id="${id}" value="${esc(val)}">${conflict?`<div class="ex-cn">⚠ 現在値「${esc(curv)}」と相違</div>`:''}</div>`; };
+    const tags=Array.isArray(r.tags)?r.tags.join(", "):"";
+    const warns=Array.isArray(r.warnings)?r.warnings.filter(Boolean):[];
+    let html=warns.length?`<div class="ex-note">⚠ AIが要確認とした項目：${warns.map(esc).join(" ／ ")}</div>`:"";
+    html+=`<p style="margin:0 0 12px;color:#5b6b63;font-size:13px;">チェックした項目だけ反映します。赤枠は既存値との相違です。（メモには触れません）</p>`;
+    html+=`<div class="ex-grid">
+      ${fld("商品名","ex_name",v(r.name),p.name,true)}
+      ${fld("英語名","ex_name_en",v(r.name_en),p.name_en)}
+      ${fld("カテゴリ","ex_category",v(r.category),p.category)}
+      ${fld("メーカー","ex_maker",v(r.maker),p.maker)}
+      ${fld("原産国","ex_origin",v(r.origin),p.origin)}
+      ${fld("タグ","ex_tags",tags,(p.tags||[]).join(", "),true)}
+    </div>`;
+    setExBody(html);
+    setExFoot('<button class="btn-ghost" id="exCancel">キャンセル</button><button class="btn-primary" id="exApply">反映する</button>');
+  }
+  function applyExtract(){
+    const p=items.find(x=>x.id===exState.id); if(!p){ hideModal("extractModal"); return; }
+    const on=id=>{ const c=document.getElementById("ck_"+id); return c&&c.checked; };
+    const val=id=>{ const e=document.getElementById(id); return e?e.value.trim():""; };
+    [["name","ex_name"],["name_en","ex_name_en"],["category","ex_category"],["maker","ex_maker"],["origin","ex_origin"]]
+      .forEach(([k,id])=>{ if(on(id)){ const x=val(id); if(x) p[k]=x; } });
+    if(on("ex_tags")){ const t=val("ex_tags"); if(t) p.tags=t.split(",").map(s=>s.trim()).filter(Boolean); }
+    p.updated_at=nowISO(); writeLocal(); queuePush(p.id); renderAll(); hideModal("extractModal"); toast("読み取り内容を反映しました");
+  }
+
   /* ---- modal helpers ---- */
   function showModal(id){ document.getElementById(id).classList.add("open"); }
   function hideModal(id){ document.getElementById(id).classList.remove("open"); }
@@ -411,6 +535,7 @@
     if(e.target.id==="btnDel") return delProd();
     if(e.target.id==="btnAddDoc"){ const sel=document.getElementById("docLabelSel"); document.getElementById("docInput").dataset.label=sel?sel.value:(db.labels[0]||"その他"); document.getElementById("docInput").click(); return; }
     if(e.target.dataset.df!==undefined){ docFilter=e.target.dataset.df; renderDetail(); return; }
+    if(e.target.dataset.fread) return startExtract(e.target.dataset.fread);
     if(e.target.dataset.fopen) return openDoc(e.target.dataset.fopen);
     if(e.target.dataset.fdel) return delDoc(e.target.dataset.fdel);
   });
@@ -443,7 +568,18 @@
     catch(e){ setSyncState("err",e.message); toast("接続に失敗: "+e.message); } });
   document.getElementById("btnSync").addEventListener("click",()=>{ if(!supaOn()){ toast("未接続です。『接続』から設定してください"); return; } supaPull().then(ok=>{ if(ok){ renderAll(); toast("最新を取得しました"); } }).catch(e=>toast("取得に失敗: "+e.message)); });
 
-  window.addEventListener("keydown",e=>{ if(e.key==="Escape"){ ["supaModal","labelModal"].forEach(hideModal); } });
+  // AI settings + extraction
+  document.getElementById("btnAI").addEventListener("click",()=>{ document.getElementById("aiKeyInput").value=getKey(); showModal("aiModal"); });
+  document.getElementById("aiClose").addEventListener("click",()=>hideModal("aiModal"));
+  document.getElementById("aiModal").addEventListener("click",e=>{ if(e.target.id==="aiModal") hideModal("aiModal"); });
+  document.getElementById("aiSave").addEventListener("click",()=>{ setKey(document.getElementById("aiKeyInput").value.trim()); hideModal("aiModal"); toast("AI設定を保存しました"); });
+  document.getElementById("aiClear").addEventListener("click",()=>{ setKey(""); document.getElementById("aiKeyInput").value=""; toast("キーを削除しました"); });
+  document.getElementById("extractModal").addEventListener("click",e=>{
+    if(e.target.id==="extractModal"||e.target.id==="exClose"||e.target.id==="exCancel") return hideModal("extractModal");
+    if(e.target.id==="exApply") return applyExtract();
+  });
+
+  window.addEventListener("keydown",e=>{ if(e.key==="Escape"){ ["supaModal","labelModal","aiModal","extractModal"].forEach(hideModal); } });
   window.addEventListener("resize",()=>setMobile(!!selId));
 
   /* boot */
