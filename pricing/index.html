@@ -34,6 +34,9 @@
   .brand .jp{font-size:12px;color:#b3b0d8;font-weight:500;letter-spacing:.03em;}
   .xlink{color:#b3b0d8;text-decoration:none;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,.18);border-radius:7px;padding:6px 11px;}
   .xlink:hover{background:rgba(255,255,255,.1);color:#fff;}
+  .navset{display:flex;gap:6px;}
+  .xlink.cur{background:rgba(255,255,255,.16);color:#fff;cursor:default;}
+  .xlink.cur:hover{background:rgba(255,255,255,.16);}
   .tabs{display:flex;gap:6px;background:rgba(255,255,255,.07);padding:4px;border-radius:10px;}
   .tab{background:transparent;border:none;color:#b3b0d8;padding:7px 15px;border-radius:7px;font-weight:600;font-size:13px;}
   .tab.active{background:#fff;color:var(--brand);}
@@ -176,7 +179,11 @@
 
 <div class="appbar">
   <div class="brand"><h1>Price&nbsp;Compare</h1><span class="jp">仕入価格比較</span></div>
-  <a class="xlink" href="../">← 貨物照合へ</a>
+  <div class="navset">
+    <a class="xlink" href="../">貨物照合</a>
+    <a class="xlink" href="../payment/">支払管理</a>
+    <span class="xlink cur">仕入価格</span>
+  </div>
   <div class="tabs">
     <button class="tab active" data-tab="compare">比較</button>
     <button class="tab" data-tab="check">価格チェック</button>
