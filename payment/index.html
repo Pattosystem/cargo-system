@@ -157,6 +157,20 @@
   .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 20px;border-radius:9px;font-size:13px;font-weight:500;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60;box-shadow:var(--shadow);}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
   .toast-undo{background:#fff;color:var(--ink);border:none;border-radius:6px;padding:4px 11px;font-weight:700;font-size:12px;margin-left:12px;cursor:pointer;}
+
+  /* AI extraction preview */
+  .ex-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .ex-field{display:flex;flex-direction:column;gap:4px;}
+  .ex-field label{font-size:11px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;}
+  .ex-field input{border:1px solid var(--line);border-radius:7px;padding:7px 9px;width:100%;}
+  .ex-field.conflict input{border-color:var(--over);background:#fff7f5;}
+  .ex-conflict-note{font-size:11px;color:var(--over);font-weight:600;}
+  .ex-spinner{display:flex;align-items:center;gap:11px;color:var(--ink-soft);padding:14px 0;font-size:14px;}
+  .spin{width:18px;height:18px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .ex-warn{background:var(--over-bg);color:var(--over);border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:10px;}
+  .ex-note{background:var(--unpaid-bg);color:var(--unpaid);border-radius:8px;padding:9px 12px;font-size:12.5px;margin-bottom:10px;font-weight:500;}
+  .file-read{padding:6px 12px;}
   @media(prefers-reduced-motion:reduce){*{transition:none!important;}}
 </style>
 </head>
@@ -171,6 +185,7 @@
   <div class="right">
     <div class="chips" id="chips"></div>
     <div class="data-tools">
+      <button class="dt-btn" id="btnAI" title="AI読み取りの設定（APIキー）">AI設定</button>
       <button class="dt-btn" id="btnConn" title="チーム同期(Supabase)の接続設定">接続</button>
       <button class="dt-btn" id="btnSync" title="サーバから最新を取得">最新を取得</button>
       <button class="dt-btn" id="btnBackup" title="全データと書類を1ファイルに保存">バックアップ</button>
@@ -215,6 +230,28 @@
       <p style="font-size:12px;color:#8a948f;margin-top:4px;">URLとキーを知っていれば誰でも読み書きできます。身内・信頼メンバー限定で。公開リポジトリにキーを直書きしないでください。</p>
     </div>
     <div class="modal-foot"><button class="btn-ghost" id="supaClear">接続を解除</button><button class="btn-primary" id="supaSave">保存して接続</button></div>
+  </div>
+</div>
+
+<!-- AI settings modal -->
+<div class="modal-bg" id="aiModal">
+  <div class="modal">
+    <div class="modal-head"><h3>AI読み取り設定</h3><button class="icon-btn" style="background:#eef1ef;border-color:#dde3e0;color:#5b6b66;" id="aiClose">閉じる</button></div>
+    <div class="modal-body">
+      <p>支払書類をAIで読み取るには Anthropic APIキー が必要です。キーは<b>この端末のブラウザ内だけ</b>に保存され、バックアップには含まれません。貨物照合と同じキーでOK（各アプリで別々に保存します）。</p>
+      <input id="aiKeyInput" placeholder="sk-ant-..." style="font-family:'JetBrains Mono',monospace;">
+      <p style="font-size:12px;color:#8a948f;margin-top:10px;">公開リポジトリやGitHub Pagesにキーを直書きしないでください。</p>
+    </div>
+    <div class="modal-foot"><button class="btn-ghost" id="aiClear">キーを削除</button><button class="btn-primary" id="aiSave">保存</button></div>
+  </div>
+</div>
+
+<!-- AI extraction preview modal -->
+<div class="modal-bg" id="extractModal">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-head"><h3>AI読み取り結果</h3><button class="icon-btn" style="background:#eef1ef;border-color:#dde3e0;color:#5b6b66;" id="exClose">閉じる</button></div>
+    <div class="modal-body" id="exBody"></div>
+    <div class="modal-foot" id="exFoot"></div>
   </div>
 </div>
 
@@ -449,10 +486,11 @@
   function filesHtml(p){
     const atts=p.attachments||[];
     if(!atts.length) return '<div class="att-empty">書類は未添付。請求書・送金控え・領収書・銀行明細などを添付できます。</div>';
-    return atts.map(f=>{ const [cls,lbl]=fileIcon(f.type);
+    return atts.map(f=>{ const [cls,lbl]=fileIcon(f.type); const canAI=/pdf|image/i.test(f.type);
       return `<div class="file-row" data-fid="${f.id}">
         <span class="file-ic ${cls}">${lbl}</span>
         <div class="file-main"><div class="file-name">${esc(f.name)}</div><div class="file-meta">${fmtSize(f.size)}・${fmtTime(f.addedAt)}</div></div>
+        ${canAI?`<button class="btn-ghost file-read" data-fread="${f.id}">AI読取</button>`:''}
         <button class="btn-ghost" data-fopen="${f.id}">開く</button>
         <button class="row-del" data-fdel="${f.id}" title="削除">×</button>
       </div>`; }).join("");
@@ -530,6 +568,111 @@
     toast("書類を削除しました");
   }
 
+  /* ---------- AI 読み取り（支払書類 → 支払情報） ---------- */
+  const AIKEY="payment-aikey";
+  function getKey(){ try{ return localStorage.getItem(AIKEY)||""; }catch(e){ return ""; } }
+  function setKey(k){ try{ if(k) localStorage.setItem(AIKEY,k); else localStorage.removeItem(AIKEY); }catch(e){} }
+
+  const EXTRACT_PROMPT = `You are extracting structured data from a payment-related document (a supplier invoice, a remittance/transfer slip, a receipt, or a bank statement) for accounts-payable management. Documents come from many suppliers and banks; layouts, languages and number formats vary widely. Read semantically, not by position. Return ONLY a JSON object — no markdown, no code fences, no commentary.
+
+Schema:
+{
+  "docType": "invoice" | "remittance" | "receipt" | "bank_statement" | "other",
+  "supplier": string|null,
+  "refNo": string|null,
+  "amount": string|null,
+  "currency": string|null,
+  "dueDate": string|null,
+  "paidDate": string|null,
+  "method": string|null,
+  "remitRef": string|null,
+  "warnings": [ string ]
+}
+
+Rules:
+- supplier: the payee / beneficiary / seller (who is being paid).
+- refNo: invoice number or main reference number.
+- amount: the main payable/paid amount, digits only with a dot decimal and NO thousands separators (e.g. "28250.00"). Handle 1,234.56 and 1.234,56.
+- currency: 3-letter ISO code; infer from symbols if no code shown.
+- dueDate / paidDate: normalise to YYYY-MM-DD. paidDate is the actual payment/transfer date if the document shows one.
+- method: payment method if shown (bank transfer / Wise / PayPal ...).
+- remitRef: transfer or transaction reference number.
+- warnings: short notes on anything ambiguous, unclear, or guessed. Empty array if confident.
+- Use null for anything not present. Never invent values.`;
+
+  async function extractDoc(blob, mediaType){
+    const b64=await blobToB64(blob);
+    const key=getKey();
+    const headers={"content-type":"application/json"};
+    if(key){ headers["x-api-key"]=key; headers["anthropic-version"]="2023-06-01"; headers["anthropic-dangerous-direct-browser-access"]="true"; }
+    const isPdf=/pdf/i.test(mediaType);
+    const source={type:"base64", media_type:isPdf?"application/pdf":(mediaType||"image/png"), data:b64};
+    const docBlock=isPdf?{type:"document",source}:{type:"image",source};
+    const body={model:"claude-sonnet-4-6",max_tokens:4096,messages:[{role:"user",content:[docBlock,{type:"text",text:EXTRACT_PROMPT}]}]};
+    const resp=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers,body:JSON.stringify(body)});
+    if(!resp.ok){ let t=""; try{ t=await resp.text(); }catch(e){} throw new Error("API "+resp.status+(t?(" "+t.slice(0,140)):"")); }
+    const data=await resp.json();
+    const text=(data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n");
+    return parseJsonLoose(text);
+  }
+  function parseJsonLoose(text){
+    let t=String(text||"").replace(/```json|```/g,"").trim();
+    try{ return JSON.parse(t); }catch(e){}
+    const a=t.indexOf("{"), b=t.lastIndexOf("}");
+    if(a>=0&&b>a){ try{ return JSON.parse(t.slice(a,b+1)); }catch(e){} }
+    throw new Error("読み取り結果を解析できませんでした（書類が長すぎる/不鮮明な可能性）");
+  }
+
+  let exState=null;
+  function setExBody(h){ document.getElementById("exBody").innerHTML=h; }
+  function setExFoot(h){ document.getElementById("exFoot").innerHTML=h; }
+  async function startExtract(fid){
+    const p=cur(); if(!p) return;
+    const meta=(p.attachments||[]).find(f=>f.id===fid); if(!meta) return;
+    exState={id:p.id, fid, result:null};
+    showModal("extractModal");
+    setExBody('<div class="ex-spinner"><span class="spin"></span>AIが書類を読み取っています…</div>');
+    setExFoot('<button class="btn-ghost" id="exCancel">キャンセル</button>');
+    try{
+      const blob=await getAttachmentBlob(fid); if(!blob) throw new Error("ファイルが見つかりません");
+      exState.result=await extractDoc(blob, meta.type||"application/pdf");
+      renderExtractResult();
+    }catch(err){
+      setExBody('<div class="ex-warn">読み取れませんでした。<br>'+esc(err.message||String(err))+'</div>'
+        +'<p style="font-size:12.5px;color:#5b6b66;">APIキーが未設定の可能性があります。上部「AI設定」でキーを登録するか、Claude.ai内でこのツールを開いてお試しください。</p>');
+      setExFoot('<button class="btn-ghost" id="exCancel">閉じる</button>');
+    }
+  }
+  function renderExtractResult(){
+    const r=exState.result||{}, p=payments.find(x=>x.id===exState.id); if(!p){ hideModal("extractModal"); return; }
+    const v=x=>x==null?"":x;
+    const exF=(label,id,val,curv)=>{ const conflict=curv&&String(curv).trim()&&val&&String(curv).trim()!==String(val).trim();
+      return `<div class="ex-field ${conflict?'conflict':''}"><label>${label}</label><input type="text" id="${id}" value="${esc(val)}">${conflict?`<div class="ex-conflict-note">⚠ 現在値「${esc(curv)}」と相違</div>`:''}</div>`; };
+    const typeLbl={invoice:"請求書",remittance:"送金控え",receipt:"領収書",bank_statement:"銀行明細"}[r.docType]||"書類";
+    const warns=Array.isArray(r.warnings)?r.warnings.filter(Boolean):[];
+    let html=warns.length?`<div class="ex-note">⚠ AIが要確認とした項目：${warns.map(esc).join(" ／ ")}</div>`:"";
+    html+=`<p style="margin:0 0 12px;color:#5b6b66;font-size:13px;">種別：<b>${typeLbl}</b>　内容を確認・修正してから反映してください。赤枠は既存値との相違です。</p>`;
+    html+=`<div class="ex-grid">
+      ${exF("仕入先","ex_supplier",v(r.supplier),p.supplier)}
+      ${exF("参照番号","ex_refNo",v(r.refNo),p.refNo)}
+      ${exF("金額","ex_amount",v(r.amount),p.amount)}
+      ${exF("通貨","ex_currency",v(r.currency),p.currency)}
+      ${exF("支払予定日","ex_dueDate",v(r.dueDate),p.dueDate)}
+      ${exF("支払日","ex_paidDate",v(r.paidDate),p.paidDate)}
+      ${exF("送金方法","ex_method",v(r.method),p.method)}
+      ${exF("送金参照番号","ex_remitRef",v(r.remitRef),p.remitRef)}
+    </div>`;
+    setExBody(html);
+    setExFoot('<button class="btn-ghost" id="exCancel">キャンセル</button><button class="btn-primary" id="exApply">反映する</button>');
+  }
+  function applyExtract(){
+    const p=payments.find(x=>x.id===exState.id); if(!p){ hideModal("extractModal"); return; }
+    const val=id=>{ const e=document.getElementById(id); return e?e.value.trim():""; };
+    [["supplier","ex_supplier"],["refNo","ex_refNo"],["amount","ex_amount"],["currency","ex_currency"],["dueDate","ex_dueDate"],["paidDate","ex_paidDate"],["method","ex_method"],["remitRef","ex_remitRef"]]
+      .forEach(([k,id])=>{ const x=val(id); if(x) p[k]=x; });
+    touch(p); save(); renderAll(); hideModal("extractModal"); toast("読み取り内容を反映しました");
+  }
+
   /* ---------- backup / restore ---------- */
   async function doBackup(){
     let files=[];
@@ -586,6 +729,7 @@
   document.getElementById("detail").addEventListener("click",e=>{
     if(e.target.id==="btnDel") return delPay();
     if(e.target.dataset.addfile!==undefined){ const inp=e.currentTarget.querySelector(".file-input"); if(inp) inp.click(); return; }
+    if(e.target.dataset.fread) return startExtract(e.target.dataset.fread);
     if(e.target.dataset.fopen) return openFile(e.target.dataset.fopen);
     if(e.target.dataset.fdel) return delFile(e.target.dataset.fdel);
   });
@@ -614,7 +758,18 @@
   });
   document.getElementById("btnSync").addEventListener("click",()=>{ if(!supaOn()){ toast("未接続です。『接続』から設定してください"); return; } supaPull().then(ok=>{ if(ok){ renderAll(); toast("最新を取得しました"); } }).catch(e=>toast("取得に失敗: "+e.message)); });
 
-  window.addEventListener("keydown",e=>{ if(e.key==="Escape"){ hideModal("supaModal"); } });
+  /* AI settings + extraction */
+  document.getElementById("btnAI").addEventListener("click",()=>{ document.getElementById("aiKeyInput").value=getKey(); showModal("aiModal"); });
+  document.getElementById("aiClose").addEventListener("click",()=>hideModal("aiModal"));
+  document.getElementById("aiModal").addEventListener("click",e=>{ if(e.target.id==="aiModal") hideModal("aiModal"); });
+  document.getElementById("aiSave").addEventListener("click",()=>{ setKey(document.getElementById("aiKeyInput").value.trim()); hideModal("aiModal"); toast("AI設定を保存しました"); });
+  document.getElementById("aiClear").addEventListener("click",()=>{ setKey(""); document.getElementById("aiKeyInput").value=""; toast("キーを削除しました"); });
+  document.getElementById("extractModal").addEventListener("click",e=>{
+    if(e.target.id==="extractModal"||e.target.id==="exClose"||e.target.id==="exCancel") return hideModal("extractModal");
+    if(e.target.id==="exApply") return applyExtract();
+  });
+
+  window.addEventListener("keydown",e=>{ if(e.key==="Escape"){ hideModal("supaModal"); hideModal("aiModal"); hideModal("extractModal"); } });
   window.addEventListener("resize",()=>setMobile(!!selId));
 
   /* boot */
