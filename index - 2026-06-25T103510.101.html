@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>支払管理 — 送金・支払予定と書類</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#16202e; --ink-soft:#5b6b66; --ink-faint:#8a948f;
+    --paper:#ffffff; --desk:#ecefed; --line:#dde3e0; --line-soft:#eef1ef;
+    --treasury:#14564a; --treasury-deep:#0e3f36; --accent:#1f7a5f;
+    --paid:#157a54; --paid-bg:#e7f4ee;
+    --unpaid:#b07514; --unpaid-bg:#fbf2e2;
+    --arrange:#2456b0; --arrange-bg:#e9eefb;
+    --over:#c0392b; --over-bg:#fcebe9;
+    --shadow:0 1px 2px rgba(22,32,46,.06), 0 8px 24px rgba(22,32,46,.06);
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{font-family:"Inter","Noto Sans JP",system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--desk);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+  .mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;}
+  button{font-family:inherit;cursor:pointer;}
+  input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
+  input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+
+  .appbar{background:var(--treasury-deep);color:#fff;padding:12px 22px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;border-bottom:3px solid var(--accent);}
+  .brand{display:flex;align-items:baseline;gap:11px;}
+  .brand h1{font-family:"Archivo",sans-serif;font-weight:800;font-size:18px;letter-spacing:.06em;margin:0;text-transform:uppercase;}
+  .brand .jp{font-size:12px;color:#9ec9bb;font-weight:500;letter-spacing:.03em;}
+  .xlink{color:#9ec9bb;text-decoration:none;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,.18);border-radius:7px;padding:6px 11px;}
+  .xlink:hover{background:rgba(255,255,255,.1);color:#fff;}
+  .chips{display:flex;gap:9px;flex-wrap:wrap;}
+  .chip{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:5px 11px;display:flex;align-items:baseline;gap:6px;}
+  .chip b{font-family:"JetBrains Mono",monospace;font-size:15px;font-weight:700;}
+  .chip span{font-size:11px;color:#9ec9bb;letter-spacing:.03em;}
+  .chip.warn b{color:#ffc78a;} .chip.warn{border-color:rgba(255,170,90,.4);}
+  .right{margin-left:auto;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+  .data-tools{display:flex;align-items:center;gap:8px;}
+  .dt-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);color:#fff;border-radius:7px;padding:6px 11px;font-size:12px;font-weight:600;}
+  .dt-btn:hover{background:rgba(255,255,255,.2);}
+  .state{font-size:11px;color:#9ec9bb;font-family:"JetBrains Mono",monospace;white-space:nowrap;}
+  .state.warn{color:#ffc78a;}
+  .storage-warn{background:#fbf2e2;color:#8a5a10;font-size:12px;padding:7px 16px;text-align:center;border-bottom:1px solid #ecd9b0;}
+
+  .layout{display:grid;grid-template-columns:360px 1fr;height:calc(100% - 64px);}
+  @media(max-width:880px){.layout{grid-template-columns:1fr;} .list[data-mh="1"]{display:none;} .detail[data-mh="1"]{display:none;}}
+
+  .list{background:var(--paper);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;}
+  .list-head{padding:13px 15px;border-bottom:1px solid var(--line);}
+  .btn-new{width:100%;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px;font-weight:600;font-size:14px;}
+  .btn-new:hover{background:var(--treasury);}
+  .search{margin-top:9px;width:100%;padding:8px 11px;border:1px solid var(--line);border-radius:8px;background:var(--line-soft);}
+  .outstanding{padding:10px 15px;border-bottom:1px solid var(--line);background:var(--line-soft);}
+  .outstanding .ttl{font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.04em;text-transform:uppercase;}
+  .out-rows{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px;}
+  .out-cur{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:14px;}
+  .out-cur small{font-size:11px;color:var(--ink-faint);font-weight:500;}
+  .cards{overflow-y:auto;flex:1;min-height:0;padding:8px;}
+  .card{border:1px solid var(--line);border-radius:9px;padding:11px 12px;margin-bottom:8px;cursor:pointer;background:#fff;transition:border-color .12s,box-shadow .12s;border-left-width:4px;}
+  .card:hover{border-color:var(--accent);}
+  .card.sel{border-color:var(--accent);box-shadow:var(--shadow);}
+  .card.st-unpaid{border-left-color:var(--unpaid);}
+  .card.st-arranging{border-left-color:var(--arrange);}
+  .card.st-paid{border-left-color:var(--paid);}
+  .card.st-overdue{border-left-color:var(--over);}
+  .card-top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .card-key{font-weight:700;font-size:14px;}
+  .card-amt{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:14px;white-space:nowrap;}
+  .card-sub{color:var(--ink-soft);font-size:12px;margin-top:3px;}
+  .card-meta{color:var(--ink-faint);font-size:11px;margin-top:4px;font-family:"JetBrains Mono",monospace;}
+  .badge{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;letter-spacing:.03em;}
+  .badge.unpaid{background:var(--unpaid-bg);color:var(--unpaid);}
+  .badge.arranging{background:var(--arrange-bg);color:var(--arrange);}
+  .badge.paid{background:var(--paid-bg);color:var(--paid);}
+  .badge.overdue{background:var(--over-bg);color:var(--over);}
+  .empty-list{padding:30px 18px;text-align:center;color:var(--ink-faint);font-size:13px;}
+  .tagrow{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+  .tag{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:.03em;white-space:nowrap;}
+  .tag.overdue{background:var(--over-bg);color:var(--over);}
+
+  .detail{overflow-y:auto;min-height:0;padding:24px;}
+  .detail-empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--ink-faint);text-align:center;gap:8px;}
+  .detail-empty .big{font-family:"Archivo",sans-serif;font-weight:700;font-size:22px;color:var(--ink-soft);}
+
+  .sheet{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);max-width:1000px;margin:0 auto;overflow:hidden;}
+  .sheet-head{background:var(--treasury-deep);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;}
+  .sheet-head .stamp{font-family:"Archivo",sans-serif;font-size:11px;letter-spacing:.18em;color:#9ec9bb;text-transform:uppercase;}
+  .sheet-head .amt{font-family:"JetBrains Mono",monospace;font-size:24px;font-weight:700;margin-top:3px;}
+  .sheet-head .tagrow .tag{background:rgba(255,255,255,.14);color:#cfe7dd;}
+  .sheet-head .tag.overdue{background:rgba(255,110,90,.25);color:#ffb4a8;}
+  .sheet-head .tag.paid{background:rgba(120,220,170,.2);color:#a9e7c8;}
+  .sheet-head .tag.unpaid{background:rgba(255,200,110,.22);color:#ffd89b;}
+  .sheet-head .tag.arranging{background:rgba(120,160,255,.22);color:#cdd9f5;}
+  .head-actions{display:flex;gap:8px;align-items:center;}
+  .upd{font-size:11px;color:#9ec9bb;font-family:"JetBrains Mono",monospace;white-space:nowrap;}
+  .icon-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);color:#fff;border-radius:7px;padding:6px 11px;font-size:12px;font-weight:600;}
+  .icon-btn:hover{background:rgba(255,255,255,.2);}
+  .icon-btn.danger:hover{background:#c0392b;border-color:#c0392b;}
+
+  .fields{padding:18px 20px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px 18px;border-bottom:1px solid var(--line-soft);}
+  @media(max-width:680px){.fields{grid-template-columns:1fr 1fr;}}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field.wide{grid-column:1/-1;}
+  .field label{font-size:11px;font-weight:600;color:var(--ink-soft);letter-spacing:.04em;text-transform:uppercase;}
+  .field input,.field select,.field textarea{border:1px solid var(--line);border-radius:7px;padding:8px 10px;background:#fff;width:100%;}
+  .field textarea{resize:vertical;min-height:38px;}
+  .field input.mono{font-weight:600;font-family:"JetBrains Mono",monospace;}
+
+  .section{padding:18px 20px;border-bottom:1px solid var(--line-soft);}
+  .section-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;gap:10px;flex-wrap:wrap;}
+  .section-bar h3{font-family:"Archivo",sans-serif;font-size:14px;letter-spacing:.04em;margin:0;text-transform:uppercase;color:var(--ink);}
+  .section .hint{font-size:12px;color:var(--ink-faint);margin:0 0 12px;}
+  .mini-btns{display:flex;gap:8px;}
+  .btn-ghost{background:#fff;border:1px solid var(--line);border-radius:7px;padding:7px 12px;font-size:12.5px;font-weight:600;color:var(--accent);}
+  .btn-ghost:hover{background:var(--line-soft);}
+
+  .files{display:flex;flex-direction:column;gap:8px;}
+  .file-row{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:9px;padding:9px 12px;background:#fff;}
+  .file-ic{font-family:"Archivo",sans-serif;font-size:10px;font-weight:800;letter-spacing:.06em;color:#fff;background:var(--treasury);border-radius:5px;padding:4px 7px;min-width:42px;text-align:center;}
+  .file-ic.img{background:#157a54;} .file-ic.pdf{background:#c0392b;}
+  .file-main{flex:1;min-width:0;}
+  .file-name{font-weight:600;font-size:13px;word-break:break-all;}
+  .file-meta{font-size:11px;color:var(--ink-faint);margin-top:2px;font-family:"JetBrains Mono",monospace;}
+  .att-empty{color:var(--ink-faint);font-size:13px;padding:14px;text-align:center;border:1px dashed var(--line);border-radius:9px;}
+  .row-del{background:none;border:none;color:var(--ink-faint);font-size:16px;line-height:1;padding:4px 8px;border-radius:6px;}
+  .row-del:hover{color:var(--over);background:var(--over-bg);}
+
+  .summary{margin:16px 20px 20px;background:var(--line-soft);border-radius:10px;padding:14px 18px;display:flex;gap:24px;flex-wrap:wrap;align-items:center;}
+  .sum-item{display:flex;flex-direction:column;}
+  .sum-item .lbl{font-size:11px;color:var(--ink-soft);letter-spacing:.04em;text-transform:uppercase;}
+  .sum-item .val{font-family:"JetBrains Mono",monospace;font-size:18px;font-weight:700;}
+  .sum-verdict{margin-left:auto;}
+  .verdict{font-family:"Archivo",sans-serif;font-weight:800;font-size:14px;letter-spacing:.03em;padding:9px 15px;border-radius:8px;text-transform:uppercase;}
+  .verdict.paid{background:var(--paid-bg);color:var(--paid);}
+  .verdict.unpaid{background:var(--unpaid-bg);color:var(--unpaid);}
+  .verdict.arranging{background:var(--arrange-bg);color:var(--arrange);}
+  .verdict.overdue{background:var(--over-bg);color:var(--over);}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(14,40,36,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:50;}
+  .modal-bg.open{display:flex;}
+  .modal{background:#fff;border-radius:12px;max-width:560px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+  .modal-head{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;}
+  .modal-head h3{margin:0;font-family:"Archivo",sans-serif;font-size:16px;letter-spacing:.03em;}
+  .modal-body{padding:18px 20px;}
+  .modal-body p{margin:0 0 10px;color:var(--ink-soft);font-size:13px;}
+  .modal-body input,.modal-body textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 11px;}
+  .modal-foot{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px;}
+  .btn-primary{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:600;}
+  .btn-primary:hover{background:var(--treasury);}
+  .modal-field{display:flex;flex-direction:column;gap:5px;margin-bottom:10px;}
+  .modal-field label{font-size:11px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;}
+
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 20px;border-radius:9px;font-size:13px;font-weight:500;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60;box-shadow:var(--shadow);}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .toast-undo{background:#fff;color:var(--ink);border:none;border-radius:6px;padding:4px 11px;font-weight:700;font-size:12px;margin-left:12px;cursor:pointer;}
+  @media(prefers-reduced-motion:reduce){*{transition:none!important;}}
+</style>
+</head>
+<body>
+
+<div class="appbar">
+  <div class="brand">
+    <h1>Payments</h1>
+    <span class="jp">支払管理 — 送金・予定・書類</span>
+  </div>
+  <a class="xlink" href="../">← 貨物照合へ</a>
+  <div class="right">
+    <div class="chips" id="chips"></div>
+    <div class="data-tools">
+      <button class="dt-btn" id="btnConn" title="チーム同期(Supabase)の接続設定">接続</button>
+      <button class="dt-btn" id="btnSync" title="サーバから最新を取得">最新を取得</button>
+      <button class="dt-btn" id="btnBackup" title="全データと書類を1ファイルに保存">バックアップ</button>
+      <button class="dt-btn" id="btnRestore" title="バックアップから復元">復元</button>
+      <span class="state" id="syncState"></span>
+      <span class="state" id="backupState"></span>
+    </div>
+    <input type="file" id="restoreInput" accept="application/json,.json" style="display:none">
+  </div>
+</div>
+
+<div id="storageWarn" class="storage-warn" style="display:none;">
+  プレビュー環境のため保存できません。GitHub Pages へ配置するか、ファイルを保存してブラウザで開くと自動保存されます。
+</div>
+
+<div class="layout">
+  <aside class="list" id="listPane">
+    <div class="list-head">
+      <button class="btn-new" id="btnNew">＋ 新規 支払</button>
+      <input class="search" id="search" placeholder="仕入先 / 参照番号で検索">
+    </div>
+    <div class="outstanding" id="outstanding"></div>
+    <div class="cards" id="cards"></div>
+  </aside>
+  <section class="detail" id="detailPane">
+    <div class="detail-empty" id="detailEmpty">
+      <div class="big">支払を選択</div>
+      <div>左から選ぶか、「＋ 新規 支払」で支払予定を登録します。</div>
+    </div>
+    <div id="detail" style="display:none;"></div>
+  </section>
+</div>
+
+<!-- Supabase connection modal -->
+<div class="modal-bg" id="supaModal">
+  <div class="modal">
+    <div class="modal-head"><h3>チーム同期 接続設定</h3><button class="icon-btn" style="background:#eef1ef;border-color:#dde3e0;color:#5b6b66;" id="supaClose">閉じる</button></div>
+    <div class="modal-body">
+      <p>SupabaseのURLとanonキーを入れると、複数PCで同じデータを共有します。値は<b>この端末のブラウザ内だけ</b>に保存され、バックアップには含まれません。貨物照合と同じURL/キーでOK（テーブルは別なのでデータは独立です）。</p>
+      <div class="modal-field"><label>Project URL</label><input id="supaUrl" placeholder="https://xxxx.supabase.co" style="font-family:'JetBrains Mono',monospace;"></div>
+      <div class="modal-field"><label>anon key</label><textarea id="supaKey" placeholder="eyJ... または sb_publishable_..." style="font-family:'JetBrains Mono',monospace;min-height:70px;resize:vertical;"></textarea></div>
+      <p style="font-size:12px;color:#8a948f;margin-top:4px;">URLとキーを知っていれば誰でも読み書きできます。身内・信頼メンバー限定で。公開リポジトリにキーを直書きしないでください。</p>
+    </div>
+    <div class="modal-foot"><button class="btn-ghost" id="supaClear">接続を解除</button><button class="btn-primary" id="supaSave">保存して接続</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  const KEY="payment-v1";
+
+  /* ---------- local storage ---------- */
+  const store={
+    read(){ try{ const v=localStorage.getItem(KEY); return v?JSON.parse(v):null; }catch(e){ return null; } },
+    write(d){ try{ localStorage.setItem(KEY,JSON.stringify(d)); return true; }catch(e){ return false; } }
+  };
+  let db=store.read()||{payments:[]};
+  if(!db.payments) db.payments=[];
+  const payments=db.payments;
+  let selId=null, filter="";
+  const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  function esc(v){ return (v==null)?"":String(v).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+  function save(){ if(!store.write(db)) document.getElementById("storageWarn").style.display="block"; scheduleSync(); }
+  function touch(o){ o.updatedAt=Date.now(); }
+
+  /* ---------- files (IndexedDB, separate DB) ---------- */
+  const IDB=(function(){
+    let dbp;
+    function open(){
+      if(dbp) return dbp;
+      dbp=new Promise((res,rej)=>{
+        let r; try{ r=indexedDB.open("payment-files",1); }catch(e){ return rej(e); }
+        r.onupgradeneeded=()=>{ if(!r.result.objectStoreNames.contains("files")) r.result.createObjectStore("files",{keyPath:"id"}); };
+        r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
+      });
+      return dbp;
+    }
+    function tx(mode){ return open().then(d=>d.transaction("files",mode).objectStore("files")); }
+    return {
+      put:rec=>tx("readwrite").then(s=>new Promise((res,rej)=>{ const q=s.put(rec); q.onsuccess=()=>res(); q.onerror=()=>rej(q.error); })),
+      get:id=>tx("readonly").then(s=>new Promise((res,rej)=>{ const q=s.get(id); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); })),
+      del:id=>tx("readwrite").then(s=>new Promise((res,rej)=>{ const q=s.delete(id); q.onsuccess=()=>res(); q.onerror=()=>rej(q.error); })),
+      all:()=>tx("readonly").then(s=>new Promise((res,rej)=>{ const q=s.getAll(); q.onsuccess=()=>res(q.result||[]); q.onerror=()=>rej(q.error); }))
+    };
+  })();
+
+  function pad(n){ return String(n).padStart(2,"0"); }
+  function fmtTime(ts){ if(!ts) return "—"; const d=new Date(ts); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+  function fmtDate(ts){ const d=new Date(ts); return `${d.getMonth()+1}/${pad(d.getDate())}`; }
+  function fmtSize(b){ b=Number(b||0); if(b<1024) return b+" B"; if(b<1048576) return (b/1024).toFixed(0)+" KB"; return (b/1048576).toFixed(1)+" MB"; }
+  function fileIcon(t){ if(/pdf/i.test(t)) return ["pdf","PDF"]; if(/image/i.test(t)) return ["img","IMG"]; return ["","FILE"]; }
+  function blobToB64(b){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(",")[1]); r.onerror=()=>rej(r.error); r.readAsDataURL(b); }); }
+  function b64ToBlob(b64,t){ const bin=atob(b64); const a=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i); return new Blob([a],{type:t||"application/octet-stream"}); }
+  function fmtAmt(v){ if(v===""||v==null) return ""; const n=Number(String(v).replace(/[^\d.-]/g,"")); if(isNaN(n)) return esc(v); return n.toLocaleString(undefined,{maximumFractionDigits:2}); }
+
+  /* ---------- Supabase 同期（payment_records / pay フォルダ） ---------- */
+  const SUPA_CFG="payment-supa";
+  function getSupa(){ try{ return JSON.parse(localStorage.getItem(SUPA_CFG)||"null"); }catch(e){ return null; } }
+  function setSupa(c){ try{ if(c&&c.url&&c.key) localStorage.setItem(SUPA_CFG,JSON.stringify(c)); else localStorage.removeItem(SUPA_CFG); }catch(e){} }
+  function supaOn(){ const c=getSupa(); return !!(c&&c.url&&c.key); }
+  function supaBase(){ return getSupa().url.replace(/\/+$/,""); }
+  function supaH(extra){ const c=getSupa(); return Object.assign({apikey:c.key,Authorization:"Bearer "+c.key},extra||{}); }
+  let syncTimer=null, lastEditTs=0, syncBusy=false;
+
+  function setSyncState(state,msg){
+    const el=document.getElementById("syncState"); if(!el) return;
+    if(!supaOn()){ el.textContent="未接続(この端末のみ)"; el.className="state"; return; }
+    const map={ok:["同期OK",""],saving:["保存中…",""],loading:["取得中…",""],err:["同期エラー","warn"]};
+    const m=map[state]||map.ok; el.textContent="同期: "+m[0]+(msg?("／"+msg):""); el.className="state"+(m[1]?(" "+m[1]):"");
+  }
+  function scheduleSync(){
+    lastEditTs=Date.now();
+    if(!supaOn()) return;
+    setSyncState("saving");
+    clearTimeout(syncTimer);
+    syncTimer=setTimeout(()=>{ supaPushAll().then(()=>setSyncState("ok")).catch(e=>setSyncState("err",e.message)); }, 800);
+  }
+  async function supaPushAll(){
+    if(!supaOn()) return;
+    const now=new Date().toISOString();
+    const rows=payments.map(p=>({id:p.id,data:p,updated_at:now}));
+    if(!rows.length) return;
+    const r=await fetch(supaBase()+"/rest/v1/payment_records",{method:"POST",headers:supaH({"Content-Type":"application/json",Prefer:"resolution=merge-duplicates"}),body:JSON.stringify(rows)});
+    if(!r.ok) throw new Error("保存"+r.status);
+  }
+  async function supaDelete(id){ if(!supaOn()) return; try{ await fetch(supaBase()+"/rest/v1/payment_records?id=eq."+encodeURIComponent(id),{method:"DELETE",headers:supaH()}); }catch(e){} }
+  async function supaPull(){
+    if(!supaOn()) return false;
+    setSyncState("loading");
+    const r=await fetch(supaBase()+"/rest/v1/payment_records?select=id,data",{headers:supaH()});
+    if(!r.ok){ setSyncState("err","取得"+r.status); return false; }
+    const rows=await r.json();
+    payments.length=0; rows.forEach(row=>payments.push(row.data)); db.payments=payments;
+    store.write(db); setSyncState("ok"); return true;
+  }
+  function supaFileUrl(id){ return supaBase()+"/storage/v1/object/public/cargo-files/pay/"+encodeURIComponent(id); }
+  async function supaUpload(id,blob,type){
+    if(!supaOn()) return false;
+    try{ const r=await fetch(supaBase()+"/storage/v1/object/cargo-files/pay/"+encodeURIComponent(id),{method:"POST",headers:supaH({"Content-Type":type||"application/octet-stream","x-upsert":"true"}),body:blob}); return r.ok; }
+    catch(e){ return false; }
+  }
+  async function supaFileDelete(id){ if(!supaOn()) return; try{ await fetch(supaBase()+"/storage/v1/object/cargo-files/pay/"+encodeURIComponent(id),{method:"DELETE",headers:supaH()}); }catch(e){} }
+  async function getAttachmentBlob(id){
+    try{ const rec=await IDB.get(id); if(rec&&rec.blob) return rec.blob; }catch(e){}
+    if(supaOn()){ try{ const r=await fetch(supaFileUrl(id)); if(r.ok) return await r.blob(); }catch(e){} }
+    return null;
+  }
+  function startAutoPull(){
+    setInterval(()=>{
+      if(!supaOn()||syncBusy) return;
+      const tag=(document.activeElement&&document.activeElement.tagName)||"";
+      if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT") return;
+      if(Date.now()-lastEditTs<6000) return;
+      if(document.querySelector(".modal-bg.open")) return;
+      syncBusy=true;
+      supaPull().then(ok=>{ if(ok) renderAll(); }).catch(()=>{}).finally(()=>{ syncBusy=false; });
+    }, 20000);
+  }
+
+  /* ---------- derive ---------- */
+  const STATUS_LABEL={unpaid:"未払い",arranging:"送金手配中",paid:"支払済"};
+  function isOverdue(p){
+    if(!p.dueDate || p.status==="paid") return false;
+    const t=new Date(); t.setHours(0,0,0,0);
+    return new Date(p.dueDate+"T00:00:00") < t;
+  }
+  function cur(){ return payments.find(x=>x.id===selId); }
+
+  /* ---------- chips + outstanding ---------- */
+  function renderChips(){
+    const el=document.getElementById("chips");
+    const unpaid=payments.filter(p=>p.status!=="paid").length;
+    const over=payments.filter(isOverdue).length;
+    const arr=payments.filter(p=>p.status==="arranging").length;
+    el.innerHTML=`
+      <div class="chip"><b>${payments.length}</b><span>支払案件</span></div>
+      <div class="chip warn"><b>${unpaid}</b><span>未払い</span></div>
+      <div class="chip warn"><b>${over}</b><span>期限超過</span></div>
+      <div class="chip"><b>${arr}</b><span>送金手配中</span></div>`;
+  }
+  function renderOutstanding(){
+    const el=document.getElementById("outstanding");
+    const byCur={};
+    payments.forEach(p=>{ if(p.status==="paid") return; const c=(p.currency||"—").toUpperCase(); const n=Number(String(p.amount||"").replace(/[^\d.-]/g,"")); if(!isNaN(n)&&n) byCur[c]=(byCur[c]||0)+n; });
+    const keys=Object.keys(byCur).sort();
+    if(!keys.length){ el.innerHTML=`<div class="ttl">未払い残高</div><div class="out-rows"><span class="out-cur" style="color:var(--paid)">なし</span></div>`; return; }
+    el.innerHTML=`<div class="ttl">未払い残高（通貨別・換算なし）</div><div class="out-rows">${keys.map(c=>`<span class="out-cur">${byCur[c].toLocaleString(undefined,{maximumFractionDigits:2})} <small>${esc(c)}</small></span>`).join("")}</div>`;
+  }
+
+  /* ---------- list ---------- */
+  function payStatus(p){ return isOverdue(p)?"overdue":(p.status||"unpaid"); }
+  function renderList(){
+    const wrap=document.getElementById("cards");
+    const f=filter.trim().toLowerCase();
+    const rows=payments.filter(p=>{ if(!f) return true; return ((p.supplier||"")+" "+(p.refNo||"")).toLowerCase().includes(f); })
+      .sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+    if(!rows.length){ wrap.innerHTML='<div class="empty-list">'+(payments.length?"該当なし":"まだ支払案件がありません。<br>「＋ 新規 支払」から登録してください。")+'</div>'; return; }
+    wrap.innerHTML=rows.map(p=>{
+      const st=payStatus(p);
+      const badge = isOverdue(p)?`<span class="badge overdue">期限超過</span>`:`<span class="badge ${p.status||'unpaid'}">${STATUS_LABEL[p.status||'unpaid']}</span>`;
+      const amt = p.amount?(fmtAmt(p.amount)+" "+esc(p.currency||"")):"金額未入力";
+      return `<div class="card st-${st} ${p.id===selId?'sel':''}" data-id="${p.id}">
+        <div class="card-top"><span class="card-key">${esc(p.supplier)||"仕入先未入力"}</span>${badge}</div>
+        <div class="card-top" style="margin-top:4px;"><span class="card-sub">${esc(p.refNo)||"参照番号なし"}</span><span class="card-amt">${amt}</span></div>
+        <div class="card-meta">${p.dueDate?("期限 "+esc(p.dueDate)):"期限未設定"}${p.paidDate?("　|　支払 "+esc(p.paidDate)):""}</div>
+      </div>`;
+    }).join("");
+  }
+
+  /* ---------- detail ---------- */
+  function detailHtml(p){
+    const st=payStatus(p);
+    const amtBig = p.amount?(fmtAmt(p.amount)+" "+esc(p.currency||"")):"金額 未入力";
+    return `<div class="sheet">
+      <div class="sheet-head">
+        <div>
+          <div class="stamp">Payment / 支払</div>
+          <div class="amt">${amtBig}</div>
+          <div class="tagrow">
+            ${isOverdue(p)?'<span class="tag overdue">支払期限 超過</span>':`<span class="tag ${p.status||'unpaid'}">${STATUS_LABEL[p.status||'unpaid']}</span>`}
+          </div>
+        </div>
+        <div class="head-actions"><span class="upd">更新 ${fmtTime(p.updatedAt)}</span><button class="icon-btn danger" id="btnDel">削除</button></div>
+      </div>
+
+      <div class="fields">
+        <div class="field"><label>仕入先</label><input class="f" data-k="supplier" value="${esc(p.supplier)}" placeholder="メーカー名 / 取引先"></div>
+        <div class="field"><label>参照番号（インボイス等・手入力）</label><input class="mono f" data-k="refNo" value="${esc(p.refNo)}" placeholder="任意"></div>
+        <div class="field"><label>ステータス</label>
+          <select class="f" data-k="status">
+            <option value="unpaid" ${(p.status||"unpaid")==="unpaid"?"selected":""}>未払い</option>
+            <option value="arranging" ${p.status==="arranging"?"selected":""}>送金手配中</option>
+            <option value="paid" ${p.status==="paid"?"selected":""}>支払済</option>
+          </select>
+        </div>
+        <div class="field"><label>金額（記録のみ／換算なし）</label><input class="mono f" data-k="amount" inputmode="decimal" value="${esc(p.amount)}" placeholder="0"></div>
+        <div class="field"><label>通貨</label><input class="f" data-k="currency" value="${esc(p.currency)}" placeholder="USD / GBP / KRW / JPY"></div>
+        <div class="field"><label>支払予定日（期限）</label><input type="date" class="f" data-k="dueDate" value="${esc(p.dueDate)}"></div>
+        <div class="field"><label>支払日（実績）</label><input type="date" class="f" data-k="paidDate" value="${esc(p.paidDate)}"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-bar"><h3>送金記録</h3></div>
+        <p class="hint">実際に送金した内容を記録します（控えは下の「支払関連書類」に添付）。</p>
+        <div class="fields" style="padding:0;border:none;">
+          <div class="field"><label>送金方法</label><input class="f" data-k="method" value="${esc(p.method)}" placeholder="銀行送金 / Wise / PayPal など"></div>
+          <div class="field"><label>送金額</label><input class="mono f" data-k="remitAmount" inputmode="decimal" value="${esc(p.remitAmount)}" placeholder="任意"></div>
+          <div class="field"><label>送金日</label><input type="date" class="f" data-k="remitDate" value="${esc(p.remitDate)}"></div>
+          <div class="field wide"><label>送金 参照番号 / 備考</label><input class="f" data-k="remitRef" value="${esc(p.remitRef)}" placeholder="送金番号・銀行参照など"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-bar"><h3>支払関連書類</h3>
+          <div class="mini-btns"><button class="btn-ghost" data-addfile>＋ 書類を添付</button></div>
+        </div>
+        <p class="hint">請求書・送金控え・領収書・銀行明細など。</p>
+        <input type="file" class="file-input" multiple style="display:none">
+        <div class="files">${filesHtml(p)}</div>
+      </div>
+
+      <div class="field wide" style="padding:18px 20px 0;"><label style="font-size:11px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;">メモ</label>
+        <textarea class="f" data-k="note" style="border:1px solid var(--line);border-radius:7px;padding:8px 10px;width:100%;resize:vertical;min-height:44px;margin-top:5px;" placeholder="支払条件・分割・特記事項など">${esc(p.note)}</textarea></div>
+
+      <div class="summary">
+        <div class="sum-item"><span class="lbl">金額</span><span class="val">${p.amount?fmtAmt(p.amount):"—"} ${esc(p.currency||"")}</span></div>
+        <div class="sum-item"><span class="lbl">送金額</span><span class="val">${p.remitAmount?fmtAmt(p.remitAmount):"—"}</span></div>
+        <div class="sum-item"><span class="lbl">期限</span><span class="val" style="font-size:15px;">${esc(p.dueDate)||"—"}</span></div>
+        <div class="sum-verdict"><span class="verdict ${st}">${st==="paid"?"✓ 支払済":st==="overdue"?"⚠ 期限超過":st==="arranging"?"… 送金手配中":"● 未払い"}</span></div>
+      </div>
+    </div>`;
+  }
+  function filesHtml(p){
+    const atts=p.attachments||[];
+    if(!atts.length) return '<div class="att-empty">書類は未添付。請求書・送金控え・領収書・銀行明細などを添付できます。</div>';
+    return atts.map(f=>{ const [cls,lbl]=fileIcon(f.type);
+      return `<div class="file-row" data-fid="${f.id}">
+        <span class="file-ic ${cls}">${lbl}</span>
+        <div class="file-main"><div class="file-name">${esc(f.name)}</div><div class="file-meta">${fmtSize(f.size)}・${fmtTime(f.addedAt)}</div></div>
+        <button class="btn-ghost" data-fopen="${f.id}">開く</button>
+        <button class="row-del" data-fdel="${f.id}" title="削除">×</button>
+      </div>`; }).join("");
+  }
+  function renderDetail(){
+    const empty=document.getElementById("detailEmpty"), c=document.getElementById("detail");
+    const p=cur();
+    if(!p){ empty.style.display="flex"; c.style.display="none"; setMobile(false); return; }
+    empty.style.display="none"; c.style.display="block"; setMobile(true);
+    c.innerHTML=detailHtml(p);
+  }
+
+  function setMobile(active){
+    if(window.innerWidth>880) return;
+    document.getElementById("listPane").dataset.mh=active?"1":"0";
+    document.getElementById("detailPane").dataset.mh=active?"0":"1";
+  }
+  let toastTimer;
+  function toast(m,undoFn,ms){
+    const t=document.getElementById("toast");
+    t.innerHTML=esc(m)+(undoFn?' <button class="toast-undo">元に戻す</button>':'');
+    t.classList.add("show");
+    if(undoFn){ t.querySelector(".toast-undo").onclick=()=>{ t.classList.remove("show"); undoFn(); }; }
+    clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"), ms||(undoFn?7000:1900));
+  }
+  function renderAll(){ renderChips(); renderOutstanding(); renderList(); renderDetail(); }
+
+  /* ---------- CRUD ---------- */
+  function newPay(){
+    const p={id:uid(),supplier:"",refNo:"",status:"unpaid",amount:"",currency:"",dueDate:"",paidDate:"",method:"",remitAmount:"",remitDate:"",remitRef:"",note:"",attachments:[],updatedAt:Date.now()};
+    payments.push(p); selId=p.id; save(); renderAll();
+    const el=document.querySelector('#detail input[data-k="supplier"]'); if(el) el.focus();
+  }
+  function delPay(){
+    const p=cur(); if(!p) return;
+    if(!confirm("この支払案件を削除しますか？（直後なら「元に戻す」で復活できます）")) return;
+    const idx=payments.findIndex(x=>x.id===p.id);
+    const removed=payments.splice(idx,1)[0]; db.payments=payments;
+    selId=null; save(); renderAll(); supaDelete(removed.id);
+    toast("支払案件を削除しました", ()=>{
+      payments.splice(Math.min(idx,payments.length),0,removed); db.payments=payments;
+      selId=removed.id; save(); renderAll(); toast("元に戻しました");
+    });
+  }
+
+  /* ---------- files ---------- */
+  async function handleFiles(fileList){
+    const p=cur(); if(!p||!fileList.length) return;
+    if(!p.attachments) p.attachments=[];
+    let n=0;
+    for(const file of fileList){
+      const id=uid();
+      try{ await IDB.put({id,name:file.name,type:file.type,size:file.size,blob:file}); }
+      catch(err){ toast("書類を保存できませんでした（プレビューでは保存不可）"); return; }
+      let remote=false; try{ remote=await supaUpload(id,file,file.type); }catch(e){}
+      p.attachments.push({id,name:file.name,type:file.type||"",size:file.size,addedAt:Date.now(),remote:remote}); n++;
+    }
+    touch(p); save(); renderDetail(); renderList();
+    toast(n+"件の書類を添付しました");
+  }
+  async function openFile(id){
+    let blob=null;
+    try{ const rec=await IDB.get(id); if(rec) blob=rec.blob; }catch(e){}
+    if(blob){ const url=URL.createObjectURL(blob); window.open(url,"_blank"); setTimeout(()=>URL.revokeObjectURL(url),60000); return; }
+    if(supaOn()){ window.open(supaFileUrl(id),"_blank"); return; }
+    toast("ファイルが見つかりません");
+  }
+  async function delFile(id){
+    const p=cur(); if(!p) return;
+    if(!confirm("この書類を削除します。よろしいですか？")) return;
+    p.attachments=(p.attachments||[]).filter(f=>f.id!==id); touch(p); save();
+    try{ await IDB.del(id); }catch(e){}
+    supaFileDelete(id);
+    renderDetail();
+    toast("書類を削除しました");
+  }
+
+  /* ---------- backup / restore ---------- */
+  async function doBackup(){
+    let files=[];
+    try{ const recs=await IDB.all(); for(const r of recs){ files.push({id:r.id,name:r.name,type:r.type,size:r.size,dataB64:await blobToB64(r.blob)}); } }catch(e){}
+    const payload={app:"payments",version:1,exportedAt:new Date().toISOString(),db:{payments},files};
+    const blob=new Blob([JSON.stringify(payload)],{type:"application/json"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+    a.download="payments-backup_"+new Date().toISOString().slice(0,10)+".json"; a.click(); URL.revokeObjectURL(a.href);
+    db.lastBackup=Date.now(); save(); renderBackupState();
+    toast("バックアップを書き出しました（書類 "+files.length+"件含む）");
+  }
+  function doRestore(file){
+    const reader=new FileReader();
+    reader.onload=async()=>{
+      let p; try{ p=JSON.parse(reader.result); }catch(e){ toast("ファイルを読み取れませんでした"); return; }
+      if(!p||!p.db||!p.db.payments){ toast("対応していないバックアップ形式です"); return; }
+      if(!confirm(`現在のデータを、このバックアップ（支払${(p.db.payments||[]).length}件）で上書きします。よろしいですか？`)) return;
+      payments.length=0; (p.db.payments||[]).forEach(x=>payments.push(x)); db.payments=payments;
+      if(p.db.lastBackup) db.lastBackup=p.db.lastBackup;
+      try{ for(const f of (p.files||[])){ await IDB.put({id:f.id,name:f.name,type:f.type,size:f.size,blob:b64ToBlob(f.dataB64,f.type)}); } }catch(e){}
+      selId=null; save(); renderAll(); renderBackupState();
+      toast("バックアップから復元しました");
+    };
+    reader.readAsText(file);
+  }
+  function renderBackupState(){
+    const el=document.getElementById("backupState"); if(!el) return;
+    if(!db.lastBackup){ el.textContent="未バックアップ"; el.className="state warn"; return; }
+    const days=Math.floor((Date.now()-db.lastBackup)/86400000);
+    el.textContent="最終BU "+fmtDate(db.lastBackup)+(days>=7?"・要更新":""); el.className="state"+(days>=7?" warn":"");
+  }
+
+  /* ---------- events ---------- */
+  function showModal(id){ document.getElementById(id).classList.add("open"); }
+  function hideModal(id){ document.getElementById(id).classList.remove("open"); }
+
+  document.getElementById("btnNew").addEventListener("click",newPay);
+  document.getElementById("search").addEventListener("input",e=>{ filter=e.target.value; renderList(); });
+  document.getElementById("cards").addEventListener("click",e=>{ const c=e.target.closest(".card"); if(!c) return; selId=c.dataset.id; renderList(); renderDetail(); });
+
+  document.getElementById("detail").addEventListener("input",e=>{
+    const p=cur(); if(!p||!e.target.classList.contains("f")) return;
+    const k=e.target.dataset.k;
+    p[k]=e.target.value; touch(p); save();
+    if(["supplier","refNo","amount","currency","dueDate","paidDate"].includes(k)){ renderList(); renderChips(); renderOutstanding(); }
+  });
+  document.getElementById("detail").addEventListener("change",e=>{
+    if(e.target.classList.contains("file-input")){ handleFiles(e.target.files); e.target.value=""; return; }
+    if(!e.target.classList.contains("f")) return;
+    if(!(e.target.tagName==="SELECT"||e.target.type==="date")) return;
+    const p=cur(); if(!p) return;
+    p[e.target.dataset.k]=e.target.value; touch(p); save(); renderDetail(); renderList(); renderChips(); renderOutstanding();
+  });
+  document.getElementById("detail").addEventListener("click",e=>{
+    if(e.target.id==="btnDel") return delPay();
+    if(e.target.dataset.addfile!==undefined){ const inp=e.currentTarget.querySelector(".file-input"); if(inp) inp.click(); return; }
+    if(e.target.dataset.fopen) return openFile(e.target.dataset.fopen);
+    if(e.target.dataset.fdel) return delFile(e.target.dataset.fdel);
+  });
+
+  document.getElementById("btnBackup").addEventListener("click",doBackup);
+  document.getElementById("btnRestore").addEventListener("click",()=>document.getElementById("restoreInput").click());
+  document.getElementById("restoreInput").addEventListener("change",e=>{ if(e.target.files[0]) doRestore(e.target.files[0]); e.target.value=""; });
+
+  document.getElementById("btnConn").addEventListener("click",()=>{ const c=getSupa()||{}; document.getElementById("supaUrl").value=c.url||""; document.getElementById("supaKey").value=c.key||""; showModal("supaModal"); });
+  document.getElementById("supaClose").addEventListener("click",()=>hideModal("supaModal"));
+  document.getElementById("supaModal").addEventListener("click",e=>{ if(e.target.id==="supaModal") hideModal("supaModal"); });
+  document.getElementById("supaClear").addEventListener("click",()=>{ setSupa(null); hideModal("supaModal"); setSyncState(); toast("接続を解除しました（この端末のみ）"); });
+  document.getElementById("supaSave").addEventListener("click",async()=>{
+    const url=document.getElementById("supaUrl").value.trim().replace(/\/+$/,"");
+    const key=document.getElementById("supaKey").value.trim();
+    if(!url||!key){ toast("URLとキーを入力してください"); return; }
+    setSupa({url,key}); hideModal("supaModal"); setSyncState("loading");
+    try{
+      const peek=await fetch(supaBase()+"/rest/v1/payment_records?select=id&limit=1",{headers:supaH()});
+      if(!peek.ok) throw new Error("接続"+peek.status);
+      const peekRows=await peek.json();
+      if(peekRows.length===0 && payments.length) await supaPushAll();
+      await supaPull(); renderAll();
+      toast("接続しました。複数PCで同期されます");
+    }catch(e){ setSyncState("err",e.message); toast("接続に失敗: "+e.message); }
+  });
+  document.getElementById("btnSync").addEventListener("click",()=>{ if(!supaOn()){ toast("未接続です。『接続』から設定してください"); return; } supaPull().then(ok=>{ if(ok){ renderAll(); toast("最新を取得しました"); } }).catch(e=>toast("取得に失敗: "+e.message)); });
+
+  window.addEventListener("keydown",e=>{ if(e.key==="Escape"){ hideModal("supaModal"); } });
+  window.addEventListener("resize",()=>setMobile(!!selId));
+
+  /* boot */
+  if(!store.write(db)) document.getElementById("storageWarn").style.display="block";
+  renderBackupState();
+  renderAll();
+  setSyncState();
+  if(supaOn()){ supaPull().then(ok=>{ if(ok) renderAll(); }).catch(e=>setSyncState("err",e.message)); }
+  startAutoPull();
+})();
+</script>
+</body>
+</html>
