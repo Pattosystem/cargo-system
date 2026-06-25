@@ -267,6 +267,8 @@
     return { put:rec=>tx("readwrite").then(s=>new Promise((res,rej)=>{ const q=s.put(rec); q.onsuccess=()=>res(); q.onerror=()=>rej(q.error); })),
       get:id=>tx("readonly").then(s=>new Promise((res,rej)=>{ const q=s.get(id); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); })) };
   })();
+  function blobToB64(b){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(",")[1]); r.onerror=()=>rej(r.error); r.readAsDataURL(b); }); }
+  function b64ToBlob(b64,t){ const bin=atob(b64); const a=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i); return new Blob([a],{type:t||"application/octet-stream"}); }
 
   /* ---- Supabase (products table + catalogs bucket) ---- */
   const SUPA_CFG="products-supa";
