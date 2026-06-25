@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>取扱商品 — 製剤と関連書類の管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1c2420; --ink-soft:#5b6b63; --ink-faint:#8d988f;
+    --paper:#ffffff; --desk:#eaefec; --line:#dbe3de; --line-soft:#eef2ef;
+    --brand:#155e52; --brand-deep:#0f463d; --accent:#1f8a6d;
+    --teal:#0d7d8c; --gold:#b07514; --gold-bg:#fbf2e2;
+    --shadow:0 1px 2px rgba(28,36,32,.06), 0 8px 24px rgba(28,36,32,.07);
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{font-family:"Inter","Noto Sans JP",system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--desk);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+  .mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;}
+  button{font-family:inherit;cursor:pointer;}
+  input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
+  input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+
+  .appbar{background:var(--brand-deep);color:#fff;padding:12px 22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;border-bottom:3px solid var(--accent);}
+  .brand{display:flex;align-items:baseline;gap:11px;}
+  .brand h1{font-family:"Archivo",sans-serif;font-weight:800;font-size:18px;letter-spacing:.05em;margin:0;text-transform:uppercase;}
+  .brand .jp{font-size:12px;color:#9fcabf;font-weight:500;letter-spacing:.03em;}
+  .navset{display:flex;gap:6px;}
+  .xlink{color:#9fcabf;text-decoration:none;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,.18);border-radius:7px;padding:6px 11px;}
+  .xlink:hover{background:rgba(255,255,255,.1);color:#fff;}
+  .xlink.cur{background:rgba(255,255,255,.16);color:#fff;cursor:default;}
+  .xlink.cur:hover{background:rgba(255,255,255,.16);}
+  .right{margin-left:auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .data-tools{display:flex;align-items:center;gap:8px;}
+  .dt-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);color:#fff;border-radius:7px;padding:6px 11px;font-size:12px;font-weight:600;}
+  .dt-btn:hover{background:rgba(255,255,255,.2);}
+  .state{font-size:11px;color:#9fcabf;font-family:"JetBrains Mono",monospace;white-space:nowrap;}
+  .state.warn{color:#ffc78a;}
+  .storage-warn{background:#fbf2e2;color:#8a5a10;font-size:12px;padding:7px 16px;text-align:center;border-bottom:1px solid #ecd9b0;}
+
+  .layout{display:grid;grid-template-columns:340px 1fr;height:calc(100% - 64px);}
+  @media(max-width:880px){.layout{grid-template-columns:1fr;} .plist[data-mh="1"]{display:none;} .pdetail[data-mh="1"]{display:none;}}
+  .plist{background:var(--paper);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;}
+  .plist-head{padding:13px 15px;border-bottom:1px solid var(--line);}
+  .btn-new{width:100%;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px;font-weight:600;font-size:14px;}
+  .btn-new:hover{background:var(--brand);}
+  .search{margin-top:9px;width:100%;padding:8px 11px;border:1px solid var(--line);border-radius:8px;background:var(--line-soft);}
+  .pcards{overflow-y:auto;flex:1;min-height:0;padding:8px;}
+  .pcard{border:1px solid var(--line);border-radius:9px;padding:11px 12px;margin-bottom:8px;cursor:pointer;background:#fff;border-left:4px solid var(--line);}
+  .pcard:hover{border-color:var(--accent);}
+  .pcard.sel{border-color:var(--accent);border-left-color:var(--accent);box-shadow:var(--shadow);}
+  .pcard-name{font-weight:700;font-size:14px;}
+  .pcard-sub{color:var(--ink-soft);font-size:12px;margin-top:3px;}
+  .pcard-meta{margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  .docchip{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--teal);font-weight:700;background:#e7f3f4;border-radius:20px;padding:1px 8px;}
+  .tagmini{font-size:10.5px;color:var(--ink-soft);background:var(--line-soft);border-radius:20px;padding:1px 8px;}
+  .empty-list{padding:30px 18px;text-align:center;color:var(--ink-faint);font-size:13px;}
+  .catblock{margin-bottom:4px;}
+  .cathead{width:100%;display:flex;align-items:center;gap:8px;background:var(--line-soft);border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-weight:700;font-size:13px;color:var(--ink);text-align:left;margin-bottom:6px;}
+  .cathead:hover{border-color:var(--accent);}
+  .cathead .cat-tw{color:var(--accent);font-size:12px;width:12px;}
+  .cathead .cat-name{flex:1;}
+  .cathead .cat-n{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--ink-faint);background:#fff;border:1px solid var(--line);border-radius:20px;padding:1px 8px;}
+  .cathead.collapsed{background:#fff;}
+  .catitems{padding-left:4px;}
+
+  .pdetail{overflow-y:auto;min-height:0;padding:24px;}
+  .detail-empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--ink-faint);text-align:center;gap:8px;}
+  .detail-empty .big{font-family:"Archivo",sans-serif;font-weight:700;font-size:22px;color:var(--ink-soft);}
+  .sheet{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);max-width:1000px;margin:0 auto;overflow:hidden;}
+  .sheet-head{background:var(--brand-deep);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;}
+  .sheet-head .stamp{font-family:"Archivo",sans-serif;font-size:11px;letter-spacing:.16em;color:#9fcabf;text-transform:uppercase;}
+  .sheet-head h2{font-size:21px;margin:3px 0 0;}
+  .sheet-head .en{font-size:12px;color:#9fcabf;margin-top:3px;}
+  .head-actions{display:flex;gap:8px;align-items:center;}
+  .upd{font-size:11px;color:#9fcabf;font-family:"JetBrains Mono",monospace;white-space:nowrap;}
+  .icon-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);color:#fff;border-radius:7px;padding:6px 11px;font-size:12px;font-weight:600;}
+  .icon-btn:hover{background:rgba(255,255,255,.2);}
+  .icon-btn.danger:hover{background:#c0392b;border-color:#c0392b;}
+
+  .fields{padding:18px 20px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px 18px;border-bottom:1px solid var(--line-soft);}
+  @media(max-width:680px){.fields{grid-template-columns:1fr 1fr;}}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field.wide{grid-column:1/-1;}
+  .field label{font-size:11px;font-weight:600;color:var(--ink-soft);letter-spacing:.04em;text-transform:uppercase;}
+  .field input,.field textarea{border:1px solid var(--line);border-radius:7px;padding:8px 10px;background:#fff;width:100%;}
+  .field textarea{resize:vertical;min-height:38px;}
+
+  .section{padding:18px 20px;}
+  .section-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:10px;flex-wrap:wrap;}
+  .section-bar h3{font-family:"Archivo",sans-serif;font-size:14px;letter-spacing:.04em;margin:0;text-transform:uppercase;color:var(--ink);}
+  .doc-add{display:flex;gap:8px;align-items:center;}
+  .doc-add select{border:1px solid var(--line);border-radius:7px;padding:7px 9px;background:#fff;}
+  .btn-ghost{background:#fff;border:1px solid var(--line);border-radius:7px;padding:7px 12px;font-size:12.5px;font-weight:600;color:var(--accent);}
+  .btn-ghost:hover{background:var(--line-soft);}
+  .filterchips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+  .fchip{font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:20px;border:1px solid var(--line);background:#fff;color:var(--ink-soft);cursor:pointer;}
+  .fchip.on{background:var(--brand);color:#fff;border-color:var(--brand);}
+  .files{display:flex;flex-direction:column;gap:8px;}
+  .file-row{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:9px;padding:9px 12px;background:#fff;}
+  .file-ic{font-family:"Archivo",sans-serif;font-size:10px;font-weight:800;letter-spacing:.06em;color:#fff;background:var(--teal);border-radius:5px;padding:4px 7px;min-width:42px;text-align:center;}
+  .file-ic.img{background:var(--accent);} .file-ic.pdf{background:#c0392b;}
+  .file-main{flex:1;min-width:0;}
+  .file-name{font-weight:600;font-size:13px;word-break:break-all;}
+  .file-meta{font-size:11px;color:var(--ink-faint);margin-top:2px;font-family:"JetBrains Mono",monospace;}
+  .doc-label{border:1px solid var(--line);border-radius:7px;padding:6px 8px;background:#fff;font-size:12px;}
+  .att-empty{color:var(--ink-faint);font-size:13px;padding:16px;text-align:center;border:1px dashed var(--line);border-radius:9px;}
+  .row-del{background:none;border:none;color:var(--ink-faint);font-size:16px;line-height:1;padding:4px 8px;border-radius:6px;}
+  .row-del:hover{color:#c0392b;background:#fcebe9;}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(15,70,61,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:50;}
+  .modal-bg.open{display:flex;}
+  .modal{background:#fff;border-radius:12px;max-width:560px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+  .modal-head{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;}
+  .modal-head h3{margin:0;font-family:"Archivo",sans-serif;font-size:16px;letter-spacing:.03em;}
+  .modal-body{padding:18px 20px;}
+  .modal-body p{margin:0 0 10px;color:var(--ink-soft);font-size:13px;}
+  .modal-body input,.modal-body textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 11px;}
+  .modal-foot{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px;}
+  .btn-primary{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:600;}
+  .btn-primary:hover{background:var(--brand);}
+  .modal-field{display:flex;flex-direction:column;gap:5px;margin-bottom:10px;}
+  .modal-field label{font-size:11px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;}
+  .lblrow{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+  .lblrow input{flex:1;}
+
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 20px;border-radius:9px;font-size:13px;font-weight:500;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60;box-shadow:var(--shadow);}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .toast-undo{background:#fff;color:var(--ink);border:none;border-radius:6px;padding:4px 11px;font-weight:700;font-size:12px;margin-left:12px;cursor:pointer;}
+  @media(prefers-reduced-motion:reduce){*{transition:none!important;}}
+</style>
+</head>
+<body>
+
+<div class="appbar">
+  <div class="brand"><h1>Products</h1><span class="jp">取扱商品 — 製剤と書類</span></div>
+  <div class="navset">
+    <a class="xlink" href="../">貨物照合</a>
+    <a class="xlink" href="../payment/">支払管理</a>
+    <a class="xlink" href="../pricing/">仕入価格</a>
+    <span class="xlink cur">取扱商品</span>
+  </div>
+  <div class="right">
+    <div class="data-tools">
+      <button class="dt-btn" id="btnLabels" title="書類の種別を管理">種別管理</button>
+      <button class="dt-btn" id="btnConn" title="チーム同期(Supabase)の接続設定">接続</button>
+      <button class="dt-btn" id="btnSync" title="サーバから最新を取得">最新を取得</button>
+      <span class="state" id="syncState"></span>
+    </div>
+  </div>
+</div>
+
+<div id="storageWarn" class="storage-warn" style="display:none;">プレビュー環境のため保存できません。GitHub Pages へ配置するか、接続設定をしてください。</div>
+
+<div class="layout">
+  <aside class="plist" id="plistPane">
+    <div class="plist-head">
+      <button class="btn-new" id="btnNew">＋ 商品を追加</button>
+      <input class="search" id="search" placeholder="商品名 / 英語名 / メーカー / タグで検索">
+    </div>
+    <div class="pcards" id="prodCards"></div>
+  </aside>
+  <section class="pdetail" id="prodDetailPane">
+    <div class="detail-empty" id="prodEmpty">
+      <div class="big">商品を選択</div>
+      <div>左から選ぶか、「＋ 商品を追加」で製剤を登録し、関連書類を添付します。</div>
+    </div>
+    <div id="prodDetail" style="display:none;"></div>
+  </section>
+</div>
+
+<!-- Supabase modal -->
+<div class="modal-bg" id="supaModal">
+  <div class="modal">
+    <div class="modal-head"><h3>チーム同期 接続設定</h3><button class="icon-btn" style="background:#eef2ef;border-color:#dbe3de;color:#5b6b63;" id="supaClose">閉じる</button></div>
+    <div class="modal-body">
+      <p>SupabaseのURLとanonキーを入れると、複数PCで同じ商品データを共有します。他アプリと同じURL/キーでOK（テーブル <b>products</b>・バケット <b>catalogs</b> を使うのでデータは独立）。値は<b>この端末のブラウザ内だけ</b>に保存されます。</p>
+      <div class="modal-field"><label>Project URL</label><input id="supaUrl" placeholder="https://xxxx.supabase.co" style="font-family:'JetBrains Mono',monospace;"></div>
+      <div class="modal-field"><label>anon key</label><textarea id="supaKey" placeholder="eyJ... または sb_publishable_..." style="font-family:'JetBrains Mono',monospace;min-height:64px;resize:vertical;"></textarea></div>
+    </div>
+    <div class="modal-foot"><button class="btn-ghost" id="supaClear">接続を解除</button><button class="btn-primary" id="supaSave">保存して接続</button></div>
+  </div>
+</div>
+
+<!-- labels modal -->
+<div class="modal-bg" id="labelModal">
+  <div class="modal">
+    <div class="modal-head"><h3>書類の種別を管理</h3><button class="icon-btn" style="background:#eef2ef;border-color:#dbe3de;color:#5b6b63;" id="labelClose">閉じる</button></div>
+    <div class="modal-body">
+      <p>添付書類の分類に使う種別です。並びや名称を変更できます（既存書類のラベルはそのまま残ります）。</p>
+      <div id="labelList"></div>
+      <button class="btn-ghost" id="labelAdd" style="margin-top:8px;">＋ 種別を追加</button>
+    </div>
+    <div class="modal-foot"><button class="btn-primary" id="labelDone">完了</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<input type="file" id="docInput" accept="application/pdf,image/*" multiple style="display:none">
+
+<script>
+(function(){
+  "use strict";
+  const KEY="products-v1";
+  const DEFAULT_LABELS=["カタログ","成分表","価格表","その他"];
+  const store={
+    read(){ try{ const v=localStorage.getItem(KEY); return v?JSON.parse(v):null; }catch(e){ return null; } },
+    write(d){ try{ localStorage.setItem(KEY,JSON.stringify(d)); return true; }catch(e){ return false; } }
+  };
+  let db=store.read()||{};
+  db.items=db.items||[]; db.labels=db.labels||DEFAULT_LABELS.slice(); db.catCollapsed=db.catCollapsed||{};
+  const items=db.items;
+  let selId=null, filter="", docFilter="ALL";
+  const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  const nowISO=()=>new Date().toISOString();
+  function esc(v){ return (v==null)?"":String(v).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+  function pad(n){ return String(n).padStart(2,"0"); }
+  function fmtTime(v){ if(!v) return "—"; const d=new Date(v); if(isNaN(d)) return "—"; return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+  function fmtSize(b){ b=Number(b||0); if(b<1024) return b+" B"; if(b<1048576) return (b/1024).toFixed(0)+" KB"; return (b/1048576).toFixed(1)+" MB"; }
+  function fileIcon(t){ if(/pdf/i.test(t)) return ["pdf","PDF"]; if(/image/i.test(t)) return ["img","IMG"]; return ["","FILE"]; }
+  function cur(){ return items.find(x=>x.id===selId); }
+  function writeLocal(){ db.items=items; if(!store.write(db)) document.getElementById("storageWarn").style.display="block"; }
+
+  /* ---- IndexedDB (offline file cache) ---- */
+  const IDB=(function(){
+    let dbp; function open(){ if(dbp) return dbp; dbp=new Promise((res,rej)=>{ let r; try{ r=indexedDB.open("products-files",1); }catch(e){ return rej(e); }
+      r.onupgradeneeded=()=>{ if(!r.result.objectStoreNames.contains("files")) r.result.createObjectStore("files",{keyPath:"id"}); };
+      r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); return dbp; }
+    function tx(m){ return open().then(d=>d.transaction("files",m).objectStore("files")); }
+    return { put:rec=>tx("readwrite").then(s=>new Promise((res,rej)=>{ const q=s.put(rec); q.onsuccess=()=>res(); q.onerror=()=>rej(q.error); })),
+      get:id=>tx("readonly").then(s=>new Promise((res,rej)=>{ const q=s.get(id); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); })) };
+  })();
+
+  /* ---- Supabase (products table + catalogs bucket) ---- */
+  const SUPA_CFG="products-supa";
+  function getSupa(){ try{ return JSON.parse(localStorage.getItem(SUPA_CFG)||"null"); }catch(e){ return null; } }
+  function setSupa(c){ try{ if(c&&c.url&&c.key) localStorage.setItem(SUPA_CFG,JSON.stringify(c)); else localStorage.removeItem(SUPA_CFG); }catch(e){} }
+  function supaOn(){ const c=getSupa(); return !!(c&&c.url&&c.key); }
+  function supaBase(){ return getSupa().url.replace(/\/+$/,""); }
+  function supaH(extra){ const c=getSupa(); return Object.assign({apikey:c.key,Authorization:"Bearer "+c.key},extra||{}); }
+  function setSyncState(state,msg){ const el=document.getElementById("syncState"); if(!el) return;
+    if(!supaOn()){ el.textContent="未接続(この端末のみ)"; el.className="state"; return; }
+    const map={ok:["同期OK",""],saving:["保存中…",""],loading:["取得中…",""],err:["同期エラー","warn"]};
+    const m=map[state]||map.ok; el.textContent="同期: "+m[0]+(msg?("／"+msg):""); el.className="state"+(m[1]?(" "+m[1]):""); }
+
+  function rowOf(it){ return { id:it.id, name:it.name||"", name_en:it.name_en||null, category:it.category||null,
+    maker:it.maker||null, origin:it.origin||null, tags:it.tags||[], note:it.note||null, documents:it.documents||[], updated_at:nowISO() }; }
+  let pushQueue=new Set(), pushTimer=null, lastEditTs=0, syncBusy=false;
+  function queuePush(id){ lastEditTs=Date.now(); if(!supaOn()){ return; } pushQueue.add(id); setSyncState("saving"); clearTimeout(pushTimer);
+    pushTimer=setTimeout(flushPush,800); }
+  async function flushPush(){ if(!supaOn()||!pushQueue.size) return; const ids=[...pushQueue]; pushQueue.clear();
+    const rows=ids.map(id=>items.find(x=>x.id===id)).filter(Boolean).map(rowOf); if(!rows.length){ setSyncState("ok"); return; }
+    try{ const r=await fetch(supaBase()+"/rest/v1/products",{method:"POST",headers:supaH({"Content-Type":"application/json",Prefer:"resolution=merge-duplicates"}),body:JSON.stringify(rows)});
+      if(!r.ok) throw new Error("保存"+r.status); setSyncState("ok"); }
+    catch(e){ ids.forEach(i=>pushQueue.add(i)); setSyncState("err",e.message); } }
+  async function supaDelete(id){ if(!supaOn()) return; try{ await fetch(supaBase()+"/rest/v1/products?id=eq."+encodeURIComponent(id),{method:"DELETE",headers:supaH()}); }catch(e){} }
+  async function supaPull(){ if(!supaOn()) return false; setSyncState("loading");
+    const r=await fetch(supaBase()+"/rest/v1/products?select=*&order=updated_at.desc",{headers:supaH()});
+    if(!r.ok){ setSyncState("err","取得"+r.status); return false; }
+    const rows=await r.json(); items.length=0;
+    rows.forEach(row=>items.push({ id:row.id, name:row.name||"", name_en:row.name_en||"", category:row.category||"",
+      maker:row.maker||"", origin:row.origin||"", tags:Array.isArray(row.tags)?row.tags:[], note:row.note||"",
+      documents:Array.isArray(row.documents)?row.documents:[], created_at:row.created_at, updated_at:row.updated_at }));
+    writeLocal(); setSyncState("ok"); return true; }
+  // storage: catalogs/{productId}/{fileId}
+  function storagePath(it,fileId){ return encodeURIComponent(it.id)+"/"+encodeURIComponent(fileId); }
+  function supaFileUrl(path){ return supaBase()+"/storage/v1/object/public/catalogs/"+path; }
+  async function supaUpload(path,blob,type){ if(!supaOn()) return false;
+    try{ const r=await fetch(supaBase()+"/storage/v1/object/catalogs/"+path,{method:"POST",headers:supaH({"Content-Type":type||"application/octet-stream","x-upsert":"true"}),body:blob}); return r.ok; }catch(e){ return false; } }
+  async function supaFileDelete(path){ if(!supaOn()) return; try{ await fetch(supaBase()+"/storage/v1/object/catalogs/"+path,{method:"DELETE",headers:supaH()}); }catch(e){} }
+  async function getDocBlob(doc){ try{ const rec=await IDB.get(doc.id); if(rec&&rec.blob) return rec.blob; }catch(e){}
+    if(supaOn()&&doc.path){ try{ const r=await fetch(supaFileUrl(doc.path)); if(r.ok) return await r.blob(); }catch(e){} } return null; }
+  function startAutoPull(){ setInterval(()=>{ if(!supaOn()||syncBusy) return;
+    const tag=(document.activeElement&&document.activeElement.tagName)||""; if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT") return;
+    if(Date.now()-lastEditTs<6000) return; if(document.querySelector(".modal-bg.open")) return;
+    syncBusy=true; supaPull().then(ok=>{ if(ok) renderAll(); }).catch(()=>{}).finally(()=>{ syncBusy=false; }); },20000); }
+
+  /* ---- list (grouped by category) ---- */
+  function pcardHtml(p){ const docs=(p.documents||[]).length;
+    return `<div class="pcard ${p.id===selId?'sel':''}" data-id="${p.id}">
+      <div class="pcard-name">${esc(p.name)||"（無名の商品）"}</div>
+      <div class="pcard-sub">${esc(p.maker)||"メーカー未設定"}${p.origin?("・"+esc(p.origin)):""}</div>
+      <div class="pcard-meta">${docs?`<span class="docchip">書類 ${docs}</span>`:`<span class="tagmini">書類なし</span>`}
+        ${(p.tags||[]).slice(0,3).map(t=>`<span class="tagmini">${esc(t)}</span>`).join("")}</div>
+    </div>`; }
+  function renderList(){
+    const wrap=document.getElementById("prodCards"); const f=filter.trim().toLowerCase();
+    const match=p=>!f || ((p.name||"")+" "+(p.name_en||"")+" "+(p.maker||"")+" "+((p.tags||[]).join(" "))).toLowerCase().includes(f);
+    const hits=items.filter(match);
+    if(!hits.length){ wrap.innerHTML='<div class="empty-list">'+(items.length?"該当なし":"まだ商品がありません。<br>「＋ 商品を追加」から登録してください。")+'</div>'; return; }
+    if(f){ wrap.innerHTML=hits.sort((a,b)=>(a.name||"").localeCompare(b.name||"")).map(pcardHtml).join(""); return; }
+    const cats=[...new Set(items.map(p=>(p.category||"").trim()).filter(Boolean))].sort();
+    let html="";
+    cats.forEach(c=>{ html+=catBlock(c,c,items.filter(p=>(p.category||"").trim()===c)); });
+    const unc=items.filter(p=>!(p.category||"").trim());
+    if(unc.length||!cats.length) html+=catBlock("__unc__","未分類",unc);
+    wrap.innerHTML=html;
+  }
+  function catBlock(id,name,list){ const collapsed=!!db.catCollapsed[id];
+    const sorted=list.slice().sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+    return `<div class="catblock"><button class="cathead ${collapsed?'collapsed':''}" data-cat="${esc(id)}">
+      <span class="cat-tw">${collapsed?'▸':'▾'}</span><span class="cat-name">${esc(name)}</span><span class="cat-n">${list.length}</span></button>
+      <div class="catitems" ${collapsed?'style="display:none;"':''}>${sorted.map(pcardHtml).join("")}</div></div>`; }
+
+  /* ---- detail ---- */
+  function docLabelOptions(sel){ return db.labels.map(l=>`<option value="${esc(l)}" ${l===sel?"selected":""}>${esc(l)}</option>`).join(""); }
+  function detailHtml(p){
+    const docs=p.documents||[];
+    const labelsPresent=[...new Set(docs.map(d=>d.label||"その他"))];
+    const chips=`<span class="fchip ${docFilter==="ALL"?"on":""}" data-df="ALL">すべて (${docs.length})</span>`+
+      labelsPresent.map(l=>`<span class="fchip ${docFilter===l?"on":""}" data-df="${esc(l)}">${esc(l)} (${docs.filter(d=>(d.label||"その他")===l).length})</span>`).join("");
+    const shown=docs.filter(d=>docFilter==="ALL"||(d.label||"その他")===docFilter);
+    return `<div class="sheet">
+      <div class="sheet-head">
+        <div><div class="stamp">Product / 製剤</div><h2>${esc(p.name)||"（無名の商品）"}</h2>${p.name_en?`<div class="en">${esc(p.name_en)}</div>`:''}</div>
+        <div class="head-actions"><span class="upd">更新 ${fmtTime(p.updated_at)}</span><button class="icon-btn danger" id="btnDel">削除</button></div>
+      </div>
+      <div class="fields">
+        <div class="field wide"><label>商品名</label><input class="f" data-k="name" value="${esc(p.name)}" placeholder="製剤名"></div>
+        <div class="field"><label>英語名</label><input class="f" data-k="name_en" value="${esc(p.name_en)}" placeholder="English name"></div>
+        <div class="field"><label>カテゴリ</label><input class="f" data-k="category" value="${esc(p.category)}" placeholder="例：ボツリヌストキシン" list="catList"></div>
+        <div class="field"><label>メーカー</label><input class="f" data-k="maker" value="${esc(p.maker)}" placeholder="製造元"></div>
+        <div class="field"><label>原産国</label><input class="f" data-k="origin" value="${esc(p.origin)}" placeholder="例：韓国"></div>
+        <div class="field wide"><label>タグ（カンマ区切り）</label><input class="f" data-k="tags" value="${esc((p.tags||[]).join(", "))}" placeholder="例：HA, リフト, 人気"></div>
+        <div class="field wide"><label>メモ</label><textarea class="f" data-k="note" placeholder="特記事項・取扱条件など">${esc(p.note)}</textarea></div>
+      </div>
+      <div class="section">
+        <div class="section-bar"><h3>関連書類</h3>
+          <div class="doc-add"><select id="docLabelSel">${docLabelOptions(db.labels[0])}</select><button class="btn-ghost" id="btnAddDoc">＋ 書類を添付</button></div>
+        </div>
+        ${docs.length?`<div class="filterchips">${chips}</div>`:''}
+        <div class="files">${shown.length?shown.map(docRow).join(""):(docs.length?'<div class="att-empty">この種別の書類はありません</div>':'<div class="att-empty">書類は未添付。カタログ・成分表・価格表などを添付できます。</div>')}</div>
+      </div>
+    </div>`;
+  }
+  function docRow(d){ const [cls,lbl]=fileIcon(d.type);
+    return `<div class="file-row" data-fid="${d.id}">
+      <span class="file-ic ${cls}">${lbl}</span>
+      <div class="file-main"><div class="file-name">${esc(d.name)}</div><div class="file-meta">${fmtSize(d.size)}・${fmtTime(d.addedAt)}</div></div>
+      <select class="doc-label" data-fid="${d.id}">${docLabelOptions(d.label||"その他")}</select>
+      <button class="btn-ghost" data-fopen="${d.id}">開く</button>
+      <button class="row-del" data-fdel="${d.id}" title="削除">×</button>
+    </div>`; }
+  function renderDetail(){
+    const empty=document.getElementById("prodEmpty"), c=document.getElementById("prodDetail"); const p=cur();
+    if(!p){ empty.style.display="flex"; c.style.display="none"; setMobile(false); return; }
+    empty.style.display="none"; c.style.display="block"; setMobile(true);
+    c.innerHTML=detailHtml(p);
+    let dl=document.getElementById("catList"); if(!dl){ dl=document.createElement("datalist"); dl.id="catList"; document.body.appendChild(dl); }
+    dl.innerHTML=[...new Set(items.map(x=>(x.category||"").trim()).filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join("");
+  }
+  function setMobile(active){ if(window.innerWidth>880) return;
+    document.getElementById("plistPane").dataset.mh=active?"1":"0"; document.getElementById("prodDetailPane").dataset.mh=active?"0":"1"; }
+  let toastTimer;
+  function toast(m,undoFn,ms){ const t=document.getElementById("toast"); t.innerHTML=esc(m)+(undoFn?' <button class="toast-undo">元に戻す</button>':'');
+    t.classList.add("show"); if(undoFn){ t.querySelector(".toast-undo").onclick=()=>{ t.classList.remove("show"); undoFn(); }; }
+    clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),ms||(undoFn?7000:1900)); }
+  function renderAll(){ renderList(); renderDetail(); }
+
+  /* ---- CRUD ---- */
+  function saveItem(){ const p=cur(); if(p) p.updated_at=nowISO(); writeLocal(); if(p) queuePush(p.id); }
+  function newProd(){ const p={id:uid(),name:"新しい商品",name_en:"",category:"",maker:"",origin:"",tags:[],note:"",documents:[],created_at:nowISO(),updated_at:nowISO()};
+    items.unshift(p); selId=p.id; writeLocal(); queuePush(p.id); renderAll();
+    const el=document.querySelector('#prodDetail input[data-k="name"]'); if(el){ el.focus(); el.select(); } }
+  function delProd(){ const p=cur(); if(!p) return;
+    if(!confirm("この商品を削除しますか？（直後なら「元に戻す」で復活できます）書類のファイルも削除されます。")) return;
+    const idx=items.findIndex(x=>x.id===p.id); const removed=items.splice(idx,1)[0]; selId=null; writeLocal(); renderAll();
+    (removed.documents||[]).forEach(d=>{ if(d.path) supaFileDelete(d.path); }); supaDelete(removed.id);
+    toast("商品を削除しました",()=>{ items.splice(Math.min(idx,items.length),0,removed); selId=removed.id; writeLocal(); queuePush(removed.id); renderAll(); }); }
+
+  /* ---- documents ---- */
+  async function handleDocs(fileList,label){ const p=cur(); if(!p||!fileList.length) return; if(!p.documents) p.documents=[]; let n=0;
+    for(const file of fileList){ const id=uid(); const path=storagePath(p,id);
+      try{ await IDB.put({id,name:file.name,type:file.type,size:file.size,blob:file}); }catch(e){}
+      let remote=false; try{ remote=await supaUpload(path,file,file.type); }catch(e){}
+      p.documents.push({id,name:file.name,type:file.type||"",size:file.size,label:label||db.labels[0]||"その他",addedAt:nowISO(),path,remote}); n++; }
+    saveItem(); renderDetail(); renderList(); toast(n+"件の書類を添付しました"); }
+  async function openDoc(id){ const p=cur(); if(!p) return; const d=(p.documents||[]).find(x=>x.id===id); if(!d) return;
+    const blob=await getDocBlob(d); if(blob){ const url=URL.createObjectURL(blob); window.open(url,"_blank"); setTimeout(()=>URL.revokeObjectURL(url),60000); return; }
+    if(supaOn()&&d.path){ window.open(supaFileUrl(d.path),"_blank"); return; } toast("ファイルが見つかりません"); }
+  function delDoc(id){ const p=cur(); if(!p) return; if(!confirm("この書類を削除します。よろしいですか？")) return;
+    const d=(p.documents||[]).find(x=>x.id===id); p.documents=(p.documents||[]).filter(x=>x.id!==id); saveItem(); renderDetail(); renderList();
+    if(d&&d.path) supaFileDelete(d.path); toast("書類を削除しました"); }
+
+  /* ---- labels modal ---- */
+  function renderLabels(){ document.getElementById("labelList").innerHTML=db.labels.map((l,i)=>`<div class="lblrow" data-i="${i}">
+    <input class="lbl-name" data-i="${i}" value="${esc(l)}"><button class="btn-ghost lbl-up" data-i="${i}" ${i===0?'disabled':''}>↑</button>
+    <button class="row-del lbl-del" data-i="${i}">×</button></div>`).join(""); }
+
+  /* ---- modal helpers ---- */
+  function showModal(id){ document.getElementById(id).classList.add("open"); }
+  function hideModal(id){ document.getElementById(id).classList.remove("open"); }
+
+  /* ================= EVENTS ================= */
+  document.getElementById("btnNew").addEventListener("click",newProd);
+  document.getElementById("search").addEventListener("input",e=>{ filter=e.target.value; renderList(); });
+  document.getElementById("prodCards").addEventListener("click",e=>{
+    const head=e.target.closest(".cathead"); if(head){ const id=head.dataset.cat; db.catCollapsed[id]=!db.catCollapsed[id]; writeLocal(); renderList(); return; }
+    const card=e.target.closest(".pcard"); if(!card) return; selId=card.dataset.id; docFilter="ALL"; renderList(); renderDetail(); });
+
+  document.getElementById("prodDetail").addEventListener("input",e=>{ const p=cur(); if(!p||!e.target.classList.contains("f")) return;
+    const k=e.target.dataset.k; if(k==="tags") p.tags=e.target.value.split(",").map(s=>s.trim()).filter(Boolean); else p[k]=e.target.value;
+    saveItem(); if(["name","maker","origin","category","tags","name_en"].includes(k)) renderList(); });
+  document.getElementById("prodDetail").addEventListener("change",e=>{
+    if(e.target.classList.contains("doc-label")){ const p=cur(); if(!p) return; const d=(p.documents||[]).find(x=>x.id===e.target.dataset.fid); if(d){ d.label=e.target.value; saveItem(); renderDetail(); } }
+  });
+  document.getElementById("prodDetail").addEventListener("click",e=>{
+    if(e.target.id==="btnDel") return delProd();
+    if(e.target.id==="btnAddDoc"){ const sel=document.getElementById("docLabelSel"); document.getElementById("docInput").dataset.label=sel?sel.value:(db.labels[0]||"その他"); document.getElementById("docInput").click(); return; }
+    if(e.target.dataset.df!==undefined){ docFilter=e.target.dataset.df; renderDetail(); return; }
+    if(e.target.dataset.fopen) return openDoc(e.target.dataset.fopen);
+    if(e.target.dataset.fdel) return delDoc(e.target.dataset.fdel);
+  });
+  document.getElementById("docInput").addEventListener("change",e=>{ if(e.target.files.length) handleDocs(e.target.files,e.target.dataset.label); e.target.value=""; });
+
+  // labels modal
+  document.getElementById("btnLabels").addEventListener("click",()=>{ renderLabels(); showModal("labelModal"); });
+  document.getElementById("labelClose").addEventListener("click",()=>{ hideModal("labelModal"); renderDetail(); });
+  document.getElementById("labelDone").addEventListener("click",()=>{ hideModal("labelModal"); renderDetail(); });
+  document.getElementById("labelModal").addEventListener("click",e=>{
+    if(e.target.id==="labelModal") { hideModal("labelModal"); renderDetail(); return; }
+    if(e.target.id==="labelAdd"){ db.labels.push("新しい種別"); writeLocal(); renderLabels(); return; }
+    if(e.target.classList.contains("lbl-del")){ const i=+e.target.dataset.i; if(db.labels.length<=1){ toast("最低1つは必要です"); return; } db.labels.splice(i,1); writeLocal(); renderLabels(); return; }
+    if(e.target.classList.contains("lbl-up")){ const i=+e.target.dataset.i; if(i>0){ const t=db.labels[i-1]; db.labels[i-1]=db.labels[i]; db.labels[i]=t; writeLocal(); renderLabels(); } return; }
+  });
+  document.getElementById("labelModal").addEventListener("input",e=>{ if(e.target.classList.contains("lbl-name")){ db.labels[+e.target.dataset.i]=e.target.value; writeLocal(); } });
+
+  // supabase
+  document.getElementById("btnConn").addEventListener("click",()=>{ const c=getSupa()||{}; document.getElementById("supaUrl").value=c.url||""; document.getElementById("supaKey").value=c.key||""; showModal("supaModal"); });
+  document.getElementById("supaClose").addEventListener("click",()=>hideModal("supaModal"));
+  document.getElementById("supaModal").addEventListener("click",e=>{ if(e.target.id==="supaModal") hideModal("supaModal"); });
+  document.getElementById("supaClear").addEventListener("click",()=>{ setSupa(null); hideModal("supaModal"); setSyncState(); toast("接続を解除しました"); });
+  document.getElementById("supaSave").addEventListener("click",async()=>{
+    const url=document.getElementById("supaUrl").value.trim().replace(/\/+$/,""); const key=document.getElementById("supaKey").value.trim();
+    if(!url||!key){ toast("URLとキーを入力してください"); return; }
+    setSupa({url,key}); hideModal("supaModal"); setSyncState("loading");
+    try{ const peek=await fetch(supaBase()+"/rest/v1/products?select=id&limit=1",{headers:supaH()}); if(!peek.ok) throw new Error("接続"+peek.status);
+      const rows=await peek.json(); if(rows.length===0 && items.length){ items.forEach(x=>pushQueue.add(x.id)); await flushPush(); }
+      await supaPull(); renderAll(); toast("接続しました。複数PCで同期されます"); }
+    catch(e){ setSyncState("err",e.message); toast("接続に失敗: "+e.message); } });
+  document.getElementById("btnSync").addEventListener("click",()=>{ if(!supaOn()){ toast("未接続です。『接続』から設定してください"); return; } supaPull().then(ok=>{ if(ok){ renderAll(); toast("最新を取得しました"); } }).catch(e=>toast("取得に失敗: "+e.message)); });
+
+  window.addEventListener("keydown",e=>{ if(e.key==="Escape"){ ["supaModal","labelModal"].forEach(hideModal); } });
+  window.addEventListener("resize",()=>setMobile(!!selId));
+
+  /* boot */
+  writeLocal(); renderAll(); setSyncState();
+  if(supaOn()){ supaPull().then(ok=>{ if(ok) renderAll(); }).catch(e=>setSyncState("err",e.message)); }
+  startAutoPull();
+})();
+</script>
+</body>
+</html>
