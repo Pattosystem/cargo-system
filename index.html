@@ -3,19 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>支払管理 — 送金・支払予定と書類</title>
+<title>貨物照合 — 発注数と到着数の差異チェック / まとめ請求管理</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --ink:#16202e; --ink-soft:#5b6b66; --ink-faint:#8a948f;
-    --paper:#ffffff; --desk:#ecefed; --line:#dde3e0; --line-soft:#eef1ef;
-    --treasury:#14564a; --treasury-deep:#0e3f36; --accent:#1f7a5f;
-    --paid:#157a54; --paid-bg:#e7f4ee;
-    --unpaid:#b07514; --unpaid-bg:#fbf2e2;
-    --arrange:#2456b0; --arrange-bg:#e9eefb;
-    --over:#c0392b; --over-bg:#fcebe9;
+    --ink:#16202e; --ink-soft:#5b6776; --ink-faint:#8a94a2;
+    --paper:#ffffff; --desk:#eceef2; --line:#dde1e7; --line-soft:#eef0f3;
+    --navy:#243b6b; --navy-deep:#1a2c50;
+    --match:#157a54; --match-bg:#e7f4ee;
+    --short:#c0392b; --short-bg:#fcebe9;
+    --over:#b07514; --over-bg:#fbf2e2;
+    --pending:#6b7785; --pending-bg:#eef0f3;
     --shadow:0 1px 2px rgba(22,32,46,.06), 0 8px 24px rgba(22,32,46,.06);
     --radius:10px;
   }
@@ -25,78 +25,81 @@
   .mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;}
   button{font-family:inherit;cursor:pointer;}
   input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
-  input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+  input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--navy);outline-offset:1px;}
 
-  .appbar{background:var(--treasury-deep);color:#fff;padding:12px 22px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;border-bottom:3px solid var(--accent);}
+  /* appbar */
+  .appbar{background:var(--navy-deep);color:#fff;padding:12px 22px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;border-bottom:3px solid var(--navy);}
   .brand{display:flex;align-items:baseline;gap:11px;}
   .brand h1{font-family:"Archivo",sans-serif;font-weight:800;font-size:18px;letter-spacing:.06em;margin:0;text-transform:uppercase;}
-  .brand .jp{font-size:12px;color:#9ec9bb;font-weight:500;letter-spacing:.03em;}
-  .xlink{color:#9ec9bb;text-decoration:none;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,.18);border-radius:7px;padding:6px 11px;}
-  .xlink:hover{background:rgba(255,255,255,.1);color:#fff;}
-  .chips{display:flex;gap:9px;flex-wrap:wrap;}
-  .chip{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:5px 11px;display:flex;align-items:baseline;gap:6px;}
-  .chip b{font-family:"JetBrains Mono",monospace;font-size:15px;font-weight:700;}
-  .chip span{font-size:11px;color:#9ec9bb;letter-spacing:.03em;}
-  .chip.warn b{color:#ffc78a;} .chip.warn{border-color:rgba(255,170,90,.4);}
+  .brand .jp{font-size:12px;color:#a9b6d4;font-weight:500;letter-spacing:.03em;}
+  .tabs{display:flex;gap:6px;background:rgba(255,255,255,.07);padding:4px;border-radius:10px;}
+  .tab{background:transparent;border:none;color:#b9c4dd;font-weight:600;font-size:13px;padding:7px 16px;border-radius:7px;letter-spacing:.03em;}
+  .tab.active{background:#fff;color:var(--navy-deep);}
   .right{margin-left:auto;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+  .chips{display:flex;gap:9px;flex-wrap:wrap;}
   .data-tools{display:flex;align-items:center;gap:8px;}
   .dt-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);color:#fff;border-radius:7px;padding:6px 11px;font-size:12px;font-weight:600;}
   .dt-btn:hover{background:rgba(255,255,255,.2);}
-  .state{font-size:11px;color:#9ec9bb;font-family:"JetBrains Mono",monospace;white-space:nowrap;}
-  .state.warn{color:#ffc78a;}
+  .backup-state{font-size:11px;color:#9fb0d4;font-family:"JetBrains Mono",monospace;white-space:nowrap;}
+  .backup-state.warn{color:#ffc78a;}
+  .chip{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:5px 11px;display:flex;align-items:baseline;gap:6px;}
+  .chip b{font-family:"JetBrains Mono",monospace;font-size:15px;font-weight:700;}
+  .chip span{font-size:11px;color:#a9b6d4;letter-spacing:.03em;}
+  .chip.warn b{color:#ffb4a8;} .chip.warn{border-color:rgba(255,120,100,.35);}
+
   .storage-warn{background:#fbf2e2;color:#8a5a10;font-size:12px;padding:7px 16px;text-align:center;border-bottom:1px solid #ecd9b0;}
 
-  .layout{display:grid;grid-template-columns:360px 1fr;height:calc(100% - 64px);}
+  /* layout */
+  .layout{display:grid;grid-template-columns:340px 1fr;height:calc(100% - 64px);}
   @media(max-width:880px){.layout{grid-template-columns:1fr;} .list[data-mh="1"]{display:none;} .detail[data-mh="1"]{display:none;}}
 
   .list{background:var(--paper);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;}
   .list-head{padding:13px 15px;border-bottom:1px solid var(--line);}
-  .btn-new{width:100%;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px;font-weight:600;font-size:14px;}
-  .btn-new:hover{background:var(--treasury);}
+  .btn-new{width:100%;background:var(--navy);color:#fff;border:none;border-radius:8px;padding:10px;font-weight:600;font-size:14px;}
+  .btn-new:hover{background:var(--navy-deep);}
   .search{margin-top:9px;width:100%;padding:8px 11px;border:1px solid var(--line);border-radius:8px;background:var(--line-soft);}
-  .outstanding{padding:10px 15px;border-bottom:1px solid var(--line);background:var(--line-soft);}
-  .outstanding .ttl{font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.04em;text-transform:uppercase;}
-  .out-rows{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px;}
-  .out-cur{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:14px;}
-  .out-cur small{font-size:11px;color:var(--ink-faint);font-weight:500;}
   .cards{overflow-y:auto;flex:1;min-height:0;padding:8px;}
   .card{border:1px solid var(--line);border-radius:9px;padding:11px 12px;margin-bottom:8px;cursor:pointer;background:#fff;transition:border-color .12s,box-shadow .12s;border-left-width:4px;}
-  .card:hover{border-color:var(--accent);}
-  .card.sel{border-color:var(--accent);box-shadow:var(--shadow);}
-  .card.st-unpaid{border-left-color:var(--unpaid);}
-  .card.st-arranging{border-left-color:var(--arrange);}
-  .card.st-paid{border-left-color:var(--paid);}
-  .card.st-overdue{border-left-color:var(--over);}
+  .card:hover{border-color:var(--navy);}
+  .card.sel{border-color:var(--navy);box-shadow:var(--shadow);}
+  .card.st-match{border-left-color:var(--match);}
+  .card.st-diff{border-left-color:var(--short);}
+  .card.st-pending,.card.st-empty{border-left-color:var(--pending);}
+  .card.pay-paid{border-left-color:var(--match);}
+  .card.pay-invoiced{border-left-color:var(--over);}
+  .card.pay-overdue{border-left-color:var(--short);}
   .card-top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
-  .card-key{font-weight:700;font-size:14px;}
-  .card-amt{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:14px;white-space:nowrap;}
+  .card-key{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:13px;}
   .card-sub{color:var(--ink-soft);font-size:12px;margin-top:3px;}
   .card-meta{color:var(--ink-faint);font-size:11px;margin-top:4px;font-family:"JetBrains Mono",monospace;}
   .badge{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;letter-spacing:.03em;}
-  .badge.unpaid{background:var(--unpaid-bg);color:var(--unpaid);}
-  .badge.arranging{background:var(--arrange-bg);color:var(--arrange);}
-  .badge.paid{background:var(--paid-bg);color:var(--paid);}
-  .badge.overdue{background:var(--over-bg);color:var(--over);}
+  .badge.match{background:var(--match-bg);color:var(--match);}
+  .badge.diff{background:var(--short-bg);color:var(--short);}
+  .badge.pending,.badge.empty{background:var(--pending-bg);color:var(--pending);}
   .empty-list{padding:30px 18px;text-align:center;color:var(--ink-faint);font-size:13px;}
   .tagrow{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
   .tag{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:.03em;white-space:nowrap;}
-  .tag.overdue{background:var(--over-bg);color:var(--over);}
+  .tag.advance{background:#e7eefb;color:#2a4a8c;}
+  .tag.unbilled{background:var(--pending-bg);color:var(--pending);}
+  .tag.invoiced{background:var(--over-bg);color:var(--over);}
+  .tag.paid{background:var(--match-bg);color:var(--match);}
+  .tag.overdue{background:var(--short-bg);color:var(--short);}
 
+  /* detail */
   .detail{overflow-y:auto;min-height:0;padding:24px;}
   .detail-empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--ink-faint);text-align:center;gap:8px;}
   .detail-empty .big{font-family:"Archivo",sans-serif;font-weight:700;font-size:22px;color:var(--ink-soft);}
 
-  .sheet{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);max-width:1000px;margin:0 auto;overflow:hidden;}
-  .sheet-head{background:var(--treasury-deep);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;}
-  .sheet-head .stamp{font-family:"Archivo",sans-serif;font-size:11px;letter-spacing:.18em;color:#9ec9bb;text-transform:uppercase;}
-  .sheet-head .amt{font-family:"JetBrains Mono",monospace;font-size:24px;font-weight:700;margin-top:3px;}
-  .sheet-head .tagrow .tag{background:rgba(255,255,255,.14);color:#cfe7dd;}
-  .sheet-head .tag.overdue{background:rgba(255,110,90,.25);color:#ffb4a8;}
+  .sheet{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);max-width:1040px;margin:0 auto;overflow:hidden;}
+  .sheet-head{background:var(--navy-deep);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;}
+  .sheet-head .stamp{font-family:"Archivo",sans-serif;font-size:11px;letter-spacing:.18em;color:#9fb0d4;text-transform:uppercase;}
+  .sheet-head .key{font-family:"JetBrains Mono",monospace;font-size:21px;font-weight:700;margin-top:2px;}
+  .sheet-head .tag.advance{background:rgba(120,160,255,.22);color:#cdd9f5;}
+  .sheet-head .tag.unbilled{background:rgba(255,255,255,.14);color:#cfd6df;}
+  .sheet-head .tag.invoiced{background:rgba(255,200,110,.22);color:#ffd89b;}
   .sheet-head .tag.paid{background:rgba(120,220,170,.2);color:#a9e7c8;}
-  .sheet-head .tag.unpaid{background:rgba(255,200,110,.22);color:#ffd89b;}
-  .sheet-head .tag.arranging{background:rgba(120,160,255,.22);color:#cdd9f5;}
-  .head-actions{display:flex;gap:8px;align-items:center;}
-  .upd{font-size:11px;color:#9ec9bb;font-family:"JetBrains Mono",monospace;white-space:nowrap;}
+  .sheet-head .tag.overdue{background:rgba(255,110,90,.25);color:#ffb4a8;}
+  .head-actions{display:flex;gap:8px;}
   .icon-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);color:#fff;border-radius:7px;padding:6px 11px;font-size:12px;font-weight:600;}
   .icon-btn:hover{background:rgba(255,255,255,.2);}
   .icon-btn.danger:hover{background:#c0392b;border-color:#c0392b;}
@@ -108,55 +111,146 @@
   .field label{font-size:11px;font-weight:600;color:var(--ink-soft);letter-spacing:.04em;text-transform:uppercase;}
   .field input,.field select,.field textarea{border:1px solid var(--line);border-radius:7px;padding:8px 10px;background:#fff;width:100%;}
   .field textarea{resize:vertical;min-height:38px;}
-  .field input.mono{font-weight:600;font-family:"JetBrains Mono",monospace;}
+  .field input.mono{font-weight:600;}
 
   .section{padding:18px 20px;border-bottom:1px solid var(--line-soft);}
-  .section-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;gap:10px;flex-wrap:wrap;}
+  .section-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:10px;flex-wrap:wrap;}
   .section-bar h3{font-family:"Archivo",sans-serif;font-size:14px;letter-spacing:.04em;margin:0;text-transform:uppercase;color:var(--ink);}
-  .section .hint{font-size:12px;color:var(--ink-faint);margin:0 0 12px;}
   .mini-btns{display:flex;gap:8px;}
-  .btn-ghost{background:#fff;border:1px solid var(--line);border-radius:7px;padding:7px 12px;font-size:12.5px;font-weight:600;color:var(--accent);}
+  .btn-ghost{background:#fff;border:1px solid var(--line);border-radius:7px;padding:7px 12px;font-size:12.5px;font-weight:600;color:var(--navy);}
   .btn-ghost:hover{background:var(--line-soft);}
 
-  .files{display:flex;flex-direction:column;gap:8px;}
-  .file-row{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:9px;padding:9px 12px;background:#fff;}
-  .file-ic{font-family:"Archivo",sans-serif;font-size:10px;font-weight:800;letter-spacing:.06em;color:#fff;background:var(--treasury);border-radius:5px;padding:4px 7px;min-width:42px;text-align:center;}
-  .file-ic.img{background:#157a54;} .file-ic.pdf{background:#c0392b;}
-  .file-main{flex:1;min-width:0;}
-  .file-name{font-weight:600;font-size:13px;word-break:break-all;}
-  .file-meta{font-size:11px;color:var(--ink-faint);margin-top:2px;font-family:"JetBrains Mono",monospace;}
-  .att-empty{color:var(--ink-faint);font-size:13px;padding:14px;text-align:center;border:1px dashed var(--line);border-radius:9px;}
+  .table-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:9px;}
+  table{border-collapse:collapse;width:100%;min-width:600px;}
+  thead th{background:var(--line-soft);text-align:left;padding:9px 12px;font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid var(--line);white-space:nowrap;}
+  th.num,td.num{text-align:right;}
+  tbody td{padding:7px 10px;border-bottom:1px solid var(--line-soft);vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr.mismatch{background:#fff7f5;}
+  tbody tr.mismatch td:first-child{box-shadow:inset 3px 0 0 var(--short);}
+  td input{border:1px solid transparent;border-radius:6px;padding:6px 8px;width:100%;background:transparent;}
+  td input:hover{border-color:var(--line);}
+  td input:focus{border-color:var(--navy);background:#fff;}
+  td input.name{min-width:150px;}
+  td input.qty{width:88px;text-align:right;font-family:"JetBrains Mono",monospace;font-weight:600;}
+  td input.note{min-width:110px;font-size:13px;}
+  .diff-cell{font-family:"JetBrains Mono",monospace;font-weight:700;white-space:nowrap;}
+  .diff-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:12px;font-weight:700;}
+  .diff-pill.match{background:var(--match-bg);color:var(--match);}
+  .diff-pill.short{background:var(--short-bg);color:var(--short);}
+  .diff-pill.over{background:var(--over-bg);color:var(--over);}
+  .diff-pill.pending{background:var(--pending-bg);color:var(--pending);}
   .row-del{background:none;border:none;color:var(--ink-faint);font-size:16px;line-height:1;padding:4px 8px;border-radius:6px;}
-  .row-del:hover{color:var(--over);background:var(--over-bg);}
+  .row-del:hover{color:var(--short);background:var(--short-bg);}
+  .add-row{margin-top:10px;}
+  .add-row button{background:#fff;border:1px dashed var(--line);border-radius:8px;padding:9px;width:100%;color:var(--navy);font-weight:600;font-size:13px;}
+  .add-row button:hover{border-color:var(--navy);background:var(--line-soft);}
 
+  /* attached shipment rows in invoice view */
+  .attached{display:flex;flex-direction:column;gap:8px;}
+  .att-row{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:9px;padding:10px 12px;background:#fff;cursor:pointer;border-left-width:4px;}
+  .att-row:hover{border-color:var(--navy);}
+  .att-row.st-match{border-left-color:var(--match);}
+  .att-row.st-diff{border-left-color:var(--short);}
+  .att-row.st-pending{border-left-color:var(--pending);}
+  .att-main{flex:1;min-width:0;}
+  .att-awb{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:13px;}
+  .att-sub{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+  .att-qty{font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--ink-soft);white-space:nowrap;}
+  .att-empty{color:var(--ink-faint);font-size:13px;padding:14px;text-align:center;border:1px dashed var(--line);border-radius:9px;}
+
+  .attach-panel{margin-top:12px;border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--line-soft);}
+  .attach-panel h4{margin:0 0 10px;font-size:12px;color:var(--ink-soft);letter-spacing:.03em;text-transform:uppercase;}
+  .att-check{display:flex;align-items:center;gap:10px;padding:8px 10px;background:#fff;border:1px solid var(--line);border-radius:8px;margin-bottom:7px;cursor:pointer;}
+  .att-check input{width:16px;height:16px;}
+  .att-check .a-awb{font-family:"JetBrains Mono",monospace;font-weight:600;font-size:13px;}
+  .att-check .a-sub{font-size:12px;color:var(--ink-soft);}
+
+  /* summary */
   .summary{margin:16px 20px 20px;background:var(--line-soft);border-radius:10px;padding:14px 18px;display:flex;gap:24px;flex-wrap:wrap;align-items:center;}
   .sum-item{display:flex;flex-direction:column;}
   .sum-item .lbl{font-size:11px;color:var(--ink-soft);letter-spacing:.04em;text-transform:uppercase;}
-  .sum-item .val{font-family:"JetBrains Mono",monospace;font-size:18px;font-weight:700;}
+  .sum-item .val{font-family:"JetBrains Mono",monospace;font-size:20px;font-weight:700;}
+  .sum-item .val.short{color:var(--short);} .sum-item .val.over{color:var(--over);} .sum-item .val.match{color:var(--match);}
   .sum-verdict{margin-left:auto;}
   .verdict{font-family:"Archivo",sans-serif;font-weight:800;font-size:14px;letter-spacing:.03em;padding:9px 15px;border-radius:8px;text-transform:uppercase;}
-  .verdict.paid{background:var(--paid-bg);color:var(--paid);}
-  .verdict.unpaid{background:var(--unpaid-bg);color:var(--unpaid);}
-  .verdict.arranging{background:var(--arrange-bg);color:var(--arrange);}
-  .verdict.overdue{background:var(--over-bg);color:var(--over);}
+  .verdict.match{background:var(--match-bg);color:var(--match);}
+  .verdict.diff{background:var(--short-bg);color:var(--short);}
+  .verdict.pending,.verdict.empty{background:var(--pending-bg);color:var(--pending);}
 
-  .modal-bg{position:fixed;inset:0;background:rgba(14,40,36,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:50;}
+  .link-note{font-size:12px;color:var(--ink-soft);margin-top:6px;}
+  .link-note a{color:var(--navy);cursor:pointer;text-decoration:underline;}
+
+  /* modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(22,32,46,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:50;}
   .modal-bg.open{display:flex;}
   .modal{background:#fff;border-radius:12px;max-width:560px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);}
   .modal-head{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;}
   .modal-head h3{margin:0;font-family:"Archivo",sans-serif;font-size:16px;letter-spacing:.03em;}
   .modal-body{padding:18px 20px;}
   .modal-body p{margin:0 0 10px;color:var(--ink-soft);font-size:13px;}
-  .modal-body input,.modal-body textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 11px;}
+  .modal-body textarea{width:100%;min-height:150px;border:1px solid var(--line);border-radius:8px;padding:10px;font-family:"JetBrains Mono",monospace;font-size:13px;resize:vertical;}
   .modal-foot{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px;}
-  .btn-primary{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:600;}
-  .btn-primary:hover{background:var(--treasury);}
-  .modal-field{display:flex;flex-direction:column;gap:5px;margin-bottom:10px;}
-  .modal-field label{font-size:11px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;}
+  .btn-primary{background:var(--navy);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:600;}
+  .btn-primary:hover{background:var(--navy-deep);}
 
   .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 20px;border-radius:9px;font-size:13px;font-weight:500;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60;box-shadow:var(--shadow);}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
   .toast-undo{background:#fff;color:var(--ink);border:none;border-radius:6px;padding:4px 11px;font-weight:700;font-size:12px;margin-left:12px;cursor:pointer;}
+
+  /* attachments */
+  .files{display:flex;flex-direction:column;gap:8px;}
+  .file-row{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:9px;padding:9px 12px;background:#fff;}
+  .file-ic{font-family:"Archivo",sans-serif;font-size:10px;font-weight:800;letter-spacing:.06em;color:#fff;background:var(--navy);border-radius:5px;padding:4px 7px;min-width:42px;text-align:center;}
+  .file-ic.img{background:#157a54;} .file-ic.pdf{background:#c0392b;}
+  .file-main{flex:1;min-width:0;}
+  .file-name{font-weight:600;font-size:13px;word-break:break-all;}
+  .file-meta{font-size:11px;color:var(--ink-faint);margin-top:2px;font-family:"JetBrains Mono",monospace;}
+  .file-open{padding:6px 12px;}
+  .upd{font-size:11px;color:#9fb0d4;align-self:center;margin-right:4px;font-family:"JetBrains Mono",monospace;white-space:nowrap;}
+
+  /* AI extraction preview */
+  .ex-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .ex-field{display:flex;flex-direction:column;gap:4px;}
+  .ex-field label{font-size:11px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;}
+  .ex-field input{border:1px solid var(--line);border-radius:7px;padding:7px 9px;width:100%;}
+  .ex-field.conflict input{border-color:var(--short);background:#fff7f5;}
+  .ex-conflict-note{font-size:11px;color:var(--short);font-weight:600;}
+  .ex-items{margin-top:14px;}
+  .ex-item{display:flex;align-items:center;gap:8px;margin-top:6px;}
+  .ex-item input[type=checkbox]{width:16px;height:16px;}
+  .ex-item input[type=text]{flex:1;border:1px solid var(--line);border-radius:6px;padding:6px 8px;}
+  .ex-item input[type=number]{width:92px;border:1px solid var(--line);border-radius:6px;padding:6px 8px;text-align:right;font-family:"JetBrains Mono",monospace;}
+  .ex-opt{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;cursor:pointer;}
+  .ex-opt input{width:16px;height:16px;}
+  .ex-spinner{display:flex;align-items:center;gap:11px;color:var(--ink-soft);padding:14px 0;font-size:14px;}
+  .spin{width:18px;height:18px;border:2px solid var(--line);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .ex-warn{background:var(--short-bg);color:var(--short);border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:10px;}
+  .ex-note{background:var(--over-bg);color:var(--over);border-radius:8px;padding:9px 12px;font-size:12.5px;margin-bottom:10px;font-weight:500;}
+
+  /* report / aggregation */
+  #view-report{padding:22px;overflow:auto;height:calc(100% - 64px);}
+  .report-card{background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);max-width:1120px;margin:0 auto;}
+  .report-head{padding:16px 20px;border-bottom:1px solid var(--line-soft);display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;}
+  .report-head h2{font-family:"Archivo",sans-serif;font-size:16px;margin:0;letter-spacing:.04em;text-transform:uppercase;color:var(--ink);}
+  .report-head .sub{font-size:12px;color:var(--ink-soft);margin-top:3px;}
+  .rep-field{display:flex;flex-direction:column;gap:4px;}
+  .rep-field label{font-size:11px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;}
+  .rep-field select{border:1px solid var(--line);border-radius:7px;padding:7px 10px;background:#fff;min-width:130px;}
+  .rep-spacer{margin-left:auto;}
+  .report-body{padding:16px 20px 22px;}
+  .pivot{border-collapse:collapse;width:100%;min-width:560px;}
+  .pivot th,.pivot td{border-bottom:1px solid var(--line-soft);padding:9px 12px;font-size:13px;white-space:nowrap;}
+  .pivot thead th{background:var(--line-soft);font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.03em;text-align:right;}
+  .pivot th.prod,.pivot td.prod{text-align:left;font-weight:600;}
+  .pivot td{text-align:right;font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums;}
+  .pivot td.prod{font-family:inherit;}
+  .pivot td.z{color:var(--ink-faint);}
+  .pivot th.tot,.pivot td.tot{background:#fbfbfc;font-weight:700;color:var(--navy);}
+  .pivot tfoot td{border-top:2px solid var(--line);background:var(--line-soft);font-weight:700;}
+  .report-empty{padding:40px 18px;text-align:center;color:var(--ink-faint);}
+  .file-read{padding:6px 12px;}
   @media(prefers-reduced-motion:reduce){*{transition:none!important;}}
 </style>
 </head>
@@ -164,19 +258,24 @@
 
 <div class="appbar">
   <div class="brand">
-    <h1>Payments</h1>
-    <span class="jp">支払管理 — 送金・予定・書類</span>
+    <h1>Cargo&nbsp;Recon</h1>
+    <span class="jp">貨物照合 × まとめ請求管理</span>
   </div>
-  <a class="xlink" href="../">← 貨物照合へ</a>
+  <div class="tabs">
+    <button class="tab active" data-tab="ships">貨物</button>
+    <button class="tab" data-tab="invoices">請求</button>
+    <button class="tab" data-tab="report">集計</button>
+  </div>
   <div class="right">
     <div class="chips" id="chips"></div>
     <div class="data-tools">
+      <button class="dt-btn" id="btnAI" title="AI読み取りの設定（APIキー）">AI設定</button>
       <button class="dt-btn" id="btnConn" title="チーム同期(Supabase)の接続設定">接続</button>
       <button class="dt-btn" id="btnSync" title="サーバから最新を取得">最新を取得</button>
       <button class="dt-btn" id="btnBackup" title="全データと書類を1ファイルに保存">バックアップ</button>
       <button class="dt-btn" id="btnRestore" title="バックアップから復元">復元</button>
-      <span class="state" id="syncState"></span>
-      <span class="state" id="backupState"></span>
+      <span class="backup-state" id="syncState"></span>
+      <span class="backup-state" id="backupState"></span>
     </div>
     <input type="file" id="restoreInput" accept="application/json,.json" style="display:none">
   </div>
@@ -186,33 +285,90 @@
   プレビュー環境のため保存できません。GitHub Pages へ配置するか、ファイルを保存してブラウザで開くと自動保存されます。
 </div>
 
-<div class="layout">
-  <aside class="list" id="listPane">
+<!-- ===== SHIPMENTS VIEW ===== -->
+<div class="layout" id="view-ships">
+  <aside class="list" id="shipList">
     <div class="list-head">
-      <button class="btn-new" id="btnNew">＋ 新規 支払</button>
-      <input class="search" id="search" placeholder="仕入先 / 参照番号で検索">
+      <button class="btn-new" id="btnNewShip">＋ 新規 貨物</button>
+      <input class="search" id="shipSearch" placeholder="AWB / 仕入先 / 品名で検索">
     </div>
-    <div class="outstanding" id="outstanding"></div>
-    <div class="cards" id="cards"></div>
+    <div class="cards" id="shipCards"></div>
   </aside>
-  <section class="detail" id="detailPane">
-    <div class="detail-empty" id="detailEmpty">
-      <div class="big">支払を選択</div>
-      <div>左から選ぶか、「＋ 新規 支払」で支払予定を登録します。</div>
+  <section class="detail" id="shipDetailPane">
+    <div class="detail-empty" id="shipEmpty">
+      <div class="big">貨物を選択</div>
+      <div>左から選ぶか、「＋ 新規 貨物」で届いた貨物を登録します。</div>
     </div>
-    <div id="detail" style="display:none;"></div>
+    <div id="shipDetail" style="display:none;"></div>
   </section>
+</div>
+
+<!-- ===== INVOICES VIEW ===== -->
+<div class="layout" id="view-invoices" style="display:none;">
+  <aside class="list" id="invList">
+    <div class="list-head">
+      <button class="btn-new" id="btnNewInv">＋ 新規 請求</button>
+      <input class="search" id="invSearch" placeholder="インボイス番号 / 仕入先で検索">
+    </div>
+    <div class="cards" id="invCards"></div>
+  </aside>
+  <section class="detail" id="invDetailPane">
+    <div class="detail-empty" id="invEmpty">
+      <div class="big">請求を選択</div>
+      <div>まとめ請求書が届いたら「＋ 新規 請求」で作成し、対象の貨物を紐づけます。</div>
+    </div>
+    <div id="invDetail" style="display:none;"></div>
+  </section>
+</div>
+
+<!-- ===== REPORT VIEW ===== -->
+<div id="view-report" style="display:none;"></div>
+
+<!-- paste import modal -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <div class="modal-head"><h3>明細を貼り付けて取込</h3><button class="icon-btn" style="background:#eef0f3;border-color:#dde1e7;color:#5b6776;" id="modalClose">閉じる</button></div>
+    <div class="modal-body">
+      <p>インボイスから <b>品名</b> と <b>発注数</b> を貼り付けます。1行1品、区切りはタブ・カンマどちらでも可。<br>例：　<span class="mono">Rejuran &nbsp;&nbsp; 50</span></p>
+      <textarea id="pasteArea" placeholder="Jalupro スーパーハイドロ	30&#10;Rejuran	50&#10;LHALA ララパフ	20"></textarea>
+    </div>
+    <div class="modal-foot"><button class="btn-ghost" id="pasteCancel">キャンセル</button><button class="btn-primary" id="pasteApply">取込む</button></div>
+  </div>
+</div>
+
+<!-- AI settings modal -->
+<div class="modal-bg" id="aiModal">
+  <div class="modal">
+    <div class="modal-head"><h3>AI読み取り設定</h3><button class="icon-btn" style="background:#eef0f3;border-color:#dde1e7;color:#5b6776;" id="aiClose">閉じる</button></div>
+    <div class="modal-body">
+      <p>書類をAIで読み取るには Anthropic APIキー が必要です。キーは<b>この端末のブラウザ内だけ</b>に保存され、バックアップには含まれません。（Claude.ai内でこのツールを開いている場合はキー無しで動くことがあります）</p>
+      <input id="aiKeyInput" class="search" placeholder="sk-ant-..." style="font-family:'JetBrains Mono',monospace;margin-top:4px;">
+      <p style="font-size:12px;color:#8a94a2;margin-top:10px;">公開リポジトリや GitHub Pages にキーを直書きしないでください。本番運用ではキーをサーバ側（Supabase Edge Function 等）に置く構成へ移行します。</p>
+    </div>
+    <div class="modal-foot"><button class="btn-ghost" id="aiClear">キーを削除</button><button class="btn-primary" id="aiSave">保存</button></div>
+  </div>
+</div>
+
+<!-- AI extraction preview modal -->
+<div class="modal-bg" id="extractModal">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-head"><h3 id="exTitle">AI読み取り結果</h3><button class="icon-btn" style="background:#eef0f3;border-color:#dde1e7;color:#5b6776;" id="exClose">閉じる</button></div>
+    <div class="modal-body" id="exBody"></div>
+    <div class="modal-foot" id="exFoot"></div>
+  </div>
 </div>
 
 <!-- Supabase connection modal -->
 <div class="modal-bg" id="supaModal">
   <div class="modal">
-    <div class="modal-head"><h3>チーム同期 接続設定</h3><button class="icon-btn" style="background:#eef1ef;border-color:#dde3e0;color:#5b6b66;" id="supaClose">閉じる</button></div>
+    <div class="modal-head"><h3>チーム同期 接続設定</h3><button class="icon-btn" style="background:#eef0f3;border-color:#dde1e7;color:#5b6776;" id="supaClose">閉じる</button></div>
     <div class="modal-body">
-      <p>SupabaseのURLとanonキーを入れると、複数PCで同じデータを共有します。値は<b>この端末のブラウザ内だけ</b>に保存され、バックアップには含まれません。貨物照合と同じURL/キーでOK（テーブルは別なのでデータは独立です）。</p>
-      <div class="modal-field"><label>Project URL</label><input id="supaUrl" placeholder="https://xxxx.supabase.co" style="font-family:'JetBrains Mono',monospace;"></div>
-      <div class="modal-field"><label>anon key</label><textarea id="supaKey" placeholder="eyJ... または sb_publishable_..." style="font-family:'JetBrains Mono',monospace;min-height:70px;resize:vertical;"></textarea></div>
-      <p style="font-size:12px;color:#8a948f;margin-top:4px;">URLとキーを知っていれば誰でも読み書きできます。身内・信頼メンバー限定で。公開リポジトリにキーを直書きしないでください。</p>
+      <p>SupabaseのURLとanonキーを入れると、複数PCで同じデータを共有します。値は<b>この端末のブラウザ内だけ</b>に保存され、バックアップには含まれません。</p>
+      <div class="ex-field" style="margin-bottom:10px;"><label>Project URL</label>
+        <input id="supaUrl" placeholder="https://xxxx.supabase.co" style="font-family:'JetBrains Mono',monospace;"></div>
+      <div class="ex-field"><label>anon key</label>
+        <textarea id="supaKey" placeholder="eyJ... または sb_publishable_..." style="border:1px solid var(--line);border-radius:7px;padding:7px 9px;font-family:'JetBrains Mono',monospace;min-height:70px;resize:vertical;"></textarea></div>
+      <p style="font-size:12px;color:#8a94a2;margin-top:10px;">URLとキーを知っていれば誰でも読み書きできます。身内・信頼メンバー限定で。公開リポジトリにキーを直書きしないでください。</p>
     </div>
     <div class="modal-foot"><button class="btn-ghost" id="supaClear">接続を解除</button><button class="btn-primary" id="supaSave">保存して接続</button></div>
   </div>
@@ -223,29 +379,98 @@
 <script>
 (function(){
   "use strict";
-  const KEY="payment-v1";
+  const KEY = "cargo-recon-v2";
 
-  /* ---------- local storage ---------- */
-  const store={
+  /* ---------- storage ---------- */
+  const store = {
     read(){ try{ const v=localStorage.getItem(KEY); return v?JSON.parse(v):null; }catch(e){ return null; } },
     write(d){ try{ localStorage.setItem(KEY,JSON.stringify(d)); return true; }catch(e){ return false; } }
   };
-  let db=store.read()||{payments:[]};
-  if(!db.payments) db.payments=[];
-  const payments=db.payments;
-  let selId=null, filter="";
-  const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-  function esc(v){ return (v==null)?"":String(v).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
-  function save(){ if(!store.write(db)) document.getElementById("storageWarn").style.display="block"; scheduleSync(); }
-  function touch(o){ o.updatedAt=Date.now(); }
+  let db = store.read() || {shipments:[], invoices:[]};
+  if(!db.shipments) db.shipments=[]; if(!db.invoices) db.invoices=[];
+  const shipments = db.shipments, invoices = db.invoices;
 
-  /* ---------- files (IndexedDB, separate DB) ---------- */
+  let activeTab="ships", selShip=null, selInv=null, shipFilter="", invFilter="", attachOpen=false;
+  const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  function save(){ if(!store.write(db)) document.getElementById("storageWarn").style.display="block"; scheduleSync(); }
+  function esc(v){ return (v==null)?"":String(v).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+  /* ---------- Supabase 同期（接続時のみ動作。未接続ならローカルのまま） ---------- */
+  const SUPA_CFG="cargo-recon-supa";
+  function getSupa(){ try{ return JSON.parse(localStorage.getItem(SUPA_CFG)||"null"); }catch(e){ return null; } }
+  function setSupa(c){ try{ if(c&&c.url&&c.key) localStorage.setItem(SUPA_CFG,JSON.stringify(c)); else localStorage.removeItem(SUPA_CFG); }catch(e){} }
+  function supaOn(){ const c=getSupa(); return !!(c&&c.url&&c.key); }
+  function supaBase(){ return getSupa().url.replace(/\/+$/,""); }
+  function supaH(extra){ const c=getSupa(); return Object.assign({apikey:c.key,Authorization:"Bearer "+c.key},extra||{}); }
+  let syncTimer=null, lastEditTs=0, syncBusy=false;
+
+  function setSyncState(state,msg){
+    const el=document.getElementById("syncState"); if(!el) return;
+    if(!supaOn()){ el.textContent="未接続(この端末のみ)"; el.className="backup-state"; return; }
+    const map={ok:["同期OK",""],saving:["保存中…",""],loading:["取得中…",""],err:["同期エラー","warn"]};
+    const m=map[state]||map.ok; el.textContent="同期: "+m[0]+(msg?("／"+msg):""); el.className="backup-state"+(m[1]?(" "+m[1]):"");
+  }
+  function scheduleSync(){
+    lastEditTs=Date.now();
+    if(!supaOn()) return;
+    setSyncState("saving");
+    clearTimeout(syncTimer);
+    syncTimer=setTimeout(()=>{ supaPushAll().then(()=>setSyncState("ok")).catch(e=>setSyncState("err",e.message)); }, 800);
+  }
+  async function supaPushAll(){
+    if(!supaOn()) return;
+    const now=new Date().toISOString();
+    const rows=shipments.map(s=>({id:s.id,kind:"shipment",data:s,updated_at:now}))
+      .concat(invoices.map(i=>({id:i.id,kind:"invoice",data:i,updated_at:now})));
+    if(!rows.length) return;
+    const r=await fetch(supaBase()+"/rest/v1/cargo_records",{method:"POST",headers:supaH({"Content-Type":"application/json",Prefer:"resolution=merge-duplicates"}),body:JSON.stringify(rows)});
+    if(!r.ok) throw new Error("保存"+r.status);
+  }
+  async function supaDelete(id){ if(!supaOn()) return; try{ await fetch(supaBase()+"/rest/v1/cargo_records?id=eq."+encodeURIComponent(id),{method:"DELETE",headers:supaH()}); }catch(e){} }
+  async function supaPull(){
+    if(!supaOn()) return false;
+    setSyncState("loading");
+    const r=await fetch(supaBase()+"/rest/v1/cargo_records?select=id,kind,data",{headers:supaH()});
+    if(!r.ok){ setSyncState("err","取得"+r.status); return false; }
+    const rows=await r.json();
+    const ships=[], invs=[];
+    rows.forEach(row=>{ if(row.kind==="shipment") ships.push(row.data); else if(row.kind==="invoice") invs.push(row.data); });
+    shipments.length=0; ships.forEach(x=>shipments.push(x)); db.shipments=shipments;
+    invoices.length=0; invs.forEach(x=>invoices.push(x)); db.invoices=invoices;
+    store.write(db); setSyncState("ok"); return true;
+  }
+  // 書類は Storage（バケット cargo-files / public）
+  function supaFileUrl(id){ return supaBase()+"/storage/v1/object/public/cargo-files/att/"+encodeURIComponent(id); }
+  async function supaUpload(id,blob,type){
+    if(!supaOn()) return false;
+    try{ const r=await fetch(supaBase()+"/storage/v1/object/cargo-files/att/"+encodeURIComponent(id),{method:"POST",headers:supaH({"Content-Type":type||"application/octet-stream","x-upsert":"true"}),body:blob}); return r.ok; }
+    catch(e){ return false; }
+  }
+  async function supaFileDelete(id){ if(!supaOn()) return; try{ await fetch(supaBase()+"/storage/v1/object/cargo-files/att/"+encodeURIComponent(id),{method:"DELETE",headers:supaH()}); }catch(e){} }
+  async function getAttachmentBlob(id){
+    try{ const rec=await IDB.get(id); if(rec&&rec.blob) return rec.blob; }catch(e){}
+    if(supaOn()){ try{ const r=await fetch(supaFileUrl(id)); if(r.ok) return await r.blob(); }catch(e){} }
+    return null;
+  }
+  function startAutoPull(){
+    setInterval(()=>{
+      if(!supaOn()||syncBusy) return;
+      const tag=(document.activeElement&&document.activeElement.tagName)||"";
+      if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT") return;   // 入力中は触らない
+      if(Date.now()-lastEditTs<6000) return;                        // 直後の編集は上書きしない
+      if(document.querySelector(".modal-bg.open")) return;          // モーダル中は触らない
+      syncBusy=true;
+      supaPull().then(ok=>{ if(ok) renderAll(); }).catch(()=>{}).finally(()=>{ syncBusy=false; });
+    }, 20000);
+  }
+
+  /* ---------- file storage (IndexedDB; large files kept out of localStorage) ---------- */
   const IDB=(function(){
     let dbp;
     function open(){
       if(dbp) return dbp;
       dbp=new Promise((res,rej)=>{
-        let r; try{ r=indexedDB.open("payment-files",1); }catch(e){ return rej(e); }
+        let r; try{ r=indexedDB.open("cargo-recon-files",1); }catch(e){ return rej(e); }
         r.onupgradeneeded=()=>{ if(!r.result.objectStoreNames.contains("files")) r.result.createObjectStore("files",{keyPath:"id"}); };
         r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
       });
@@ -260,257 +485,519 @@
     };
   })();
 
+  /* ---------- format / file helpers ---------- */
   function pad(n){ return String(n).padStart(2,"0"); }
   function fmtTime(ts){ if(!ts) return "—"; const d=new Date(ts); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
   function fmtDate(ts){ const d=new Date(ts); return `${d.getMonth()+1}/${pad(d.getDate())}`; }
   function fmtSize(b){ b=Number(b||0); if(b<1024) return b+" B"; if(b<1048576) return (b/1024).toFixed(0)+" KB"; return (b/1048576).toFixed(1)+" MB"; }
-  function fileIcon(t){ if(/pdf/i.test(t)) return ["pdf","PDF"]; if(/image/i.test(t)) return ["img","IMG"]; return ["","FILE"]; }
-  function blobToB64(b){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(",")[1]); r.onerror=()=>rej(r.error); r.readAsDataURL(b); }); }
-  function b64ToBlob(b64,t){ const bin=atob(b64); const a=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i); return new Blob([a],{type:t||"application/octet-stream"}); }
-  function fmtAmt(v){ if(v===""||v==null) return ""; const n=Number(String(v).replace(/[^\d.-]/g,"")); if(isNaN(n)) return esc(v); return n.toLocaleString(undefined,{maximumFractionDigits:2}); }
+  function fileIcon(type){ if(/pdf/i.test(type)) return ["pdf","PDF"]; if(/image/i.test(type)) return ["img","IMG"]; return ["","FILE"]; }
+  function blobToB64(blob){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(",")[1]); r.onerror=()=>rej(r.error); r.readAsDataURL(blob); }); }
+  function b64ToBlob(b64,type){ const bin=atob(b64); const arr=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i); return new Blob([arr],{type:type||"application/octet-stream"}); }
 
-  /* ---------- Supabase 同期（payment_records / pay フォルダ） ---------- */
-  const SUPA_CFG="payment-supa";
-  function getSupa(){ try{ return JSON.parse(localStorage.getItem(SUPA_CFG)||"null"); }catch(e){ return null; } }
-  function setSupa(c){ try{ if(c&&c.url&&c.key) localStorage.setItem(SUPA_CFG,JSON.stringify(c)); else localStorage.removeItem(SUPA_CFG); }catch(e){} }
-  function supaOn(){ const c=getSupa(); return !!(c&&c.url&&c.key); }
-  function supaBase(){ return getSupa().url.replace(/\/+$/,""); }
-  function supaH(extra){ const c=getSupa(); return Object.assign({apikey:c.key,Authorization:"Bearer "+c.key},extra||{}); }
-  let syncTimer=null, lastEditTs=0, syncBusy=false;
+  /* ---------- derived ---------- */
+  const STATUS_LABEL={match:"一致",diff:"差異あり",pending:"未確認",empty:"明細なし"};
+  const PAY_LABEL={invoiced:"請求済・未払い",paid:"支払済"};
 
-  function setSyncState(state,msg){
-    const el=document.getElementById("syncState"); if(!el) return;
-    if(!supaOn()){ el.textContent="未接続(この端末のみ)"; el.className="state"; return; }
-    const map={ok:["同期OK",""],saving:["保存中…",""],loading:["取得中…",""],err:["同期エラー","warn"]};
-    const m=map[state]||map.ok; el.textContent="同期: "+m[0]+(msg?("／"+msg):""); el.className="state"+(m[1]?(" "+m[1]):"");
+  function lineDiff(it){ const a=it.arrived; if(a===""||a==null) return null; return Number(a)-Number(it.ordered||0); }
+  function shipStatus(s){
+    if(!s.items.length) return "empty";
+    let pend=false,diff=false;
+    s.items.forEach(it=>{ const d=lineDiff(it); if(d===null)pend=true; else if(d!==0)diff=true; });
+    if(diff) return "diff"; if(pend) return "pending"; return "match";
   }
-  function scheduleSync(){
-    lastEditTs=Date.now();
-    if(!supaOn()) return;
-    setSyncState("saving");
-    clearTimeout(syncTimer);
-    syncTimer=setTimeout(()=>{ supaPushAll().then(()=>setSyncState("ok")).catch(e=>setSyncState("err",e.message)); }, 800);
+  function shipmentsOf(invId){ return shipments.filter(s=>s.invoiceId===invId); }
+  function invoiceOf(s){ return s.invoiceId ? invoices.find(i=>i.id===s.invoiceId) : null; }
+  function invStatus(inv){
+    const ss=shipmentsOf(inv.id);
+    if(!ss.length) return "empty";
+    let pend=false,diff=false;
+    ss.forEach(s=>{ const st=shipStatus(s); if(st==="diff")diff=true; else if(st==="pending"||st==="empty")pend=true; });
+    if(diff) return "diff"; if(pend) return "pending"; return "match";
   }
-  async function supaPushAll(){
-    if(!supaOn()) return;
-    const now=new Date().toISOString();
-    const rows=payments.map(p=>({id:p.id,data:p,updated_at:now}));
-    if(!rows.length) return;
-    const r=await fetch(supaBase()+"/rest/v1/payment_records",{method:"POST",headers:supaH({"Content-Type":"application/json",Prefer:"resolution=merge-duplicates"}),body:JSON.stringify(rows)});
-    if(!r.ok) throw new Error("保存"+r.status);
-  }
-  async function supaDelete(id){ if(!supaOn()) return; try{ await fetch(supaBase()+"/rest/v1/payment_records?id=eq."+encodeURIComponent(id),{method:"DELETE",headers:supaH()}); }catch(e){} }
-  async function supaPull(){
-    if(!supaOn()) return false;
-    setSyncState("loading");
-    const r=await fetch(supaBase()+"/rest/v1/payment_records?select=id,data",{headers:supaH()});
-    if(!r.ok){ setSyncState("err","取得"+r.status); return false; }
-    const rows=await r.json();
-    payments.length=0; rows.forEach(row=>payments.push(row.data)); db.payments=payments;
-    store.write(db); setSyncState("ok"); return true;
-  }
-  function supaFileUrl(id){ return supaBase()+"/storage/v1/object/public/cargo-files/pay/"+encodeURIComponent(id); }
-  async function supaUpload(id,blob,type){
-    if(!supaOn()) return false;
-    try{ const r=await fetch(supaBase()+"/storage/v1/object/cargo-files/pay/"+encodeURIComponent(id),{method:"POST",headers:supaH({"Content-Type":type||"application/octet-stream","x-upsert":"true"}),body:blob}); return r.ok; }
-    catch(e){ return false; }
-  }
-  async function supaFileDelete(id){ if(!supaOn()) return; try{ await fetch(supaBase()+"/storage/v1/object/cargo-files/pay/"+encodeURIComponent(id),{method:"DELETE",headers:supaH()}); }catch(e){} }
-  async function getAttachmentBlob(id){
-    try{ const rec=await IDB.get(id); if(rec&&rec.blob) return rec.blob; }catch(e){}
-    if(supaOn()){ try{ const r=await fetch(supaFileUrl(id)); if(r.ok) return await r.blob(); }catch(e){} }
-    return null;
-  }
-  function startAutoPull(){
-    setInterval(()=>{
-      if(!supaOn()||syncBusy) return;
-      const tag=(document.activeElement&&document.activeElement.tagName)||"";
-      if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT") return;
-      if(Date.now()-lastEditTs<6000) return;
-      if(document.querySelector(".modal-bg.open")) return;
-      syncBusy=true;
-      supaPull().then(ok=>{ if(ok) renderAll(); }).catch(()=>{}).finally(()=>{ syncBusy=false; });
-    }, 20000);
-  }
-
-  /* ---------- derive ---------- */
-  const STATUS_LABEL={unpaid:"未払い",arranging:"送金手配中",paid:"支払済"};
-  function isOverdue(p){
-    if(!p.dueDate || p.status==="paid") return false;
+  function isOverdue(inv){
+    if(!inv.dueDate || inv.payStatus==="paid") return false;
     const t=new Date(); t.setHours(0,0,0,0);
-    return new Date(p.dueDate+"T00:00:00") < t;
+    return new Date(inv.dueDate+"T00:00:00") < t;
   }
-  function cur(){ return payments.find(x=>x.id===selId); }
 
-  /* ---------- chips + outstanding ---------- */
+  /* ---------- chips (context-sensitive) ---------- */
   function renderChips(){
     const el=document.getElementById("chips");
-    const unpaid=payments.filter(p=>p.status!=="paid").length;
-    const over=payments.filter(isOverdue).length;
-    const arr=payments.filter(p=>p.status==="arranging").length;
-    el.innerHTML=`
-      <div class="chip"><b>${payments.length}</b><span>支払案件</span></div>
-      <div class="chip warn"><b>${unpaid}</b><span>未払い</span></div>
-      <div class="chip warn"><b>${over}</b><span>期限超過</span></div>
-      <div class="chip"><b>${arr}</b><span>送金手配中</span></div>`;
-  }
-  function renderOutstanding(){
-    const el=document.getElementById("outstanding");
-    const byCur={};
-    payments.forEach(p=>{ if(p.status==="paid") return; const c=(p.currency||"—").toUpperCase(); const n=Number(String(p.amount||"").replace(/[^\d.-]/g,"")); if(!isNaN(n)&&n) byCur[c]=(byCur[c]||0)+n; });
-    const keys=Object.keys(byCur).sort();
-    if(!keys.length){ el.innerHTML=`<div class="ttl">未払い残高</div><div class="out-rows"><span class="out-cur" style="color:var(--paid)">なし</span></div>`; return; }
-    el.innerHTML=`<div class="ttl">未払い残高（通貨別・換算なし）</div><div class="out-rows">${keys.map(c=>`<span class="out-cur">${byCur[c].toLocaleString(undefined,{maximumFractionDigits:2})} <small>${esc(c)}</small></span>`).join("")}</div>`;
+    if(activeTab==="report"){
+      const r=buildReport();
+      el.innerHTML=`
+        <div class="chip"><b>${r.grand}</b><span>総入庫数</span></div>
+        <div class="chip"><b>${r.products.length}</b><span>商品種類</span></div>
+        <div class="chip"><b>${r.months.filter(m=>m!==r.noDate).length}</b><span>対象月数</span></div>`;
+      return;
+    }
+    if(activeTab==="ships"){
+      const diff=shipments.filter(s=>shipStatus(s)==="diff").length;
+      const pend=shipments.filter(s=>shipStatus(s)==="pending").length;
+      const unbilled=shipments.filter(s=>!s.invoiceId).length;
+      el.innerHTML=`
+        <div class="chip"><b>${shipments.length}</b><span>貨物</span></div>
+        <div class="chip warn"><b>${diff}</b><span>差異あり</span></div>
+        <div class="chip"><b>${pend}</b><span>数量未確認</span></div>
+        <div class="chip warn"><b>${unbilled}</b><span>未請求</span></div>`;
+    }else{
+      const unpaid=invoices.filter(i=>i.payStatus!=="paid").length;
+      const over=invoices.filter(isOverdue).length;
+      const withDiff=invoices.filter(i=>invStatus(i)==="diff").length;
+      el.innerHTML=`
+        <div class="chip"><b>${invoices.length}</b><span>請求</span></div>
+        <div class="chip warn"><b>${unpaid}</b><span>未払い</span></div>
+        <div class="chip warn"><b>${over}</b><span>期限超過</span></div>
+        <div class="chip"><b>${withDiff}</b><span>差異を含む</span></div>`;
+    }
   }
 
-  /* ---------- list ---------- */
-  function payStatus(p){ return isOverdue(p)?"overdue":(p.status||"unpaid"); }
-  function renderList(){
-    const wrap=document.getElementById("cards");
-    const f=filter.trim().toLowerCase();
-    const rows=payments.filter(p=>{ if(!f) return true; return ((p.supplier||"")+" "+(p.refNo||"")).toLowerCase().includes(f); })
-      .sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
-    if(!rows.length){ wrap.innerHTML='<div class="empty-list">'+(payments.length?"該当なし":"まだ支払案件がありません。<br>「＋ 新規 支払」から登録してください。")+'</div>'; return; }
-    wrap.innerHTML=rows.map(p=>{
-      const st=payStatus(p);
-      const badge = isOverdue(p)?`<span class="badge overdue">期限超過</span>`:`<span class="badge ${p.status||'unpaid'}">${STATUS_LABEL[p.status||'unpaid']}</span>`;
-      const amt = p.amount?(fmtAmt(p.amount)+" "+esc(p.currency||"")):"金額未入力";
-      return `<div class="card st-${st} ${p.id===selId?'sel':''}" data-id="${p.id}">
-        <div class="card-top"><span class="card-key">${esc(p.supplier)||"仕入先未入力"}</span>${badge}</div>
-        <div class="card-top" style="margin-top:4px;"><span class="card-sub">${esc(p.refNo)||"参照番号なし"}</span><span class="card-amt">${amt}</span></div>
-        <div class="card-meta">${p.dueDate?("期限 "+esc(p.dueDate)):"期限未設定"}${p.paidDate?("　|　支払 "+esc(p.paidDate)):""}</div>
+  /* ---------- shipments list ---------- */
+  function renderShipList(){
+    const wrap=document.getElementById("shipCards");
+    const f=shipFilter.trim().toLowerCase();
+    const rows=shipments.filter(s=>{
+      if(!f) return true;
+      const itemNames=s.items.map(i=>i.name).join(" ");
+      return (s.awbNo+" "+s.supplier+" "+itemNames).toLowerCase().includes(f);
+    }).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+    if(!rows.length){ wrap.innerHTML='<div class="empty-list">'+(shipments.length?"該当なし":"まだ貨物がありません。<br>「＋ 新規 貨物」から登録してください。")+'</div>'; return; }
+    wrap.innerHTML=rows.map(s=>{
+      const st=shipStatus(s);
+      const inv=invoiceOf(s);
+      const title=(s.awbNo?("AWB "+esc(s.awbNo)):"（AWB未入力）");
+      const tags=[];
+      if(s.dealType==="advance") tags.push('<span class="tag advance">先出し</span>');
+      if(!inv) tags.push('<span class="tag unbilled">未請求</span>');
+      else if(isOverdue(inv)) tags.push('<span class="tag overdue">期限超過</span>');
+      else tags.push(`<span class="tag ${inv.payStatus}">${PAY_LABEL[inv.payStatus]}</span>`);
+      return `<div class="card st-${st} ${s.id===selShip?'sel':''}" data-id="${s.id}">
+        <div class="card-top"><span class="card-key">${title}</span><span class="badge ${st}">${STATUS_LABEL[st]}</span></div>
+        <div class="card-sub">${esc(s.supplier)||"仕入先未入力"}</div>
+        <div class="card-meta">${inv?("INV "+esc(inv.invoiceNo||"—")):"請求書 未紐づけ"}　|　${s.items.length}品</div>
+        <div class="tagrow">${tags.join("")}</div>
       </div>`;
     }).join("");
   }
 
-  /* ---------- detail ---------- */
-  function detailHtml(p){
-    const st=payStatus(p);
-    const amtBig = p.amount?(fmtAmt(p.amount)+" "+esc(p.currency||"")):"金額 未入力";
-    return `<div class="sheet">
+  /* ---------- shipment detail ---------- */
+  function shipDetailHtml(s){
+    const inv=invoiceOf(s);
+    const invOptions=invoices.map(i=>`<option value="${i.id}" ${i.id===s.invoiceId?"selected":""}>INV ${esc(i.invoiceNo||"(無番号)")} — ${esc(i.supplier)||"仕入先?"}</option>`).join("");
+    const st=shipStatus(s);
+    return `
+    <div class="sheet">
       <div class="sheet-head">
         <div>
-          <div class="stamp">Payment / 支払</div>
-          <div class="amt">${amtBig}</div>
+          <div class="stamp">AWB / 航空運送状</div>
+          <div class="key">${esc(s.awbNo)||"未入力"}</div>
           <div class="tagrow">
-            ${isOverdue(p)?'<span class="tag overdue">支払期限 超過</span>':`<span class="tag ${p.status||'unpaid'}">${STATUS_LABEL[p.status||'unpaid']}</span>`}
+            ${s.dealType==="advance"?'<span class="tag advance">先出し（後請求）</span>':''}
+            ${inv?(isOverdue(inv)?'<span class="tag overdue">支払期限 超過</span>':`<span class="tag ${inv.payStatus}">${PAY_LABEL[inv.payStatus]}</span>`):'<span class="tag unbilled">未請求</span>'}
           </div>
         </div>
-        <div class="head-actions"><span class="upd">更新 ${fmtTime(p.updatedAt)}</span><button class="icon-btn danger" id="btnDel">削除</button></div>
+        <div class="head-actions"><span class="upd">更新 ${fmtTime(s.updatedAt)}</span><button class="icon-btn danger" id="btnDelShip">削除</button></div>
       </div>
 
       <div class="fields">
-        <div class="field"><label>仕入先</label><input class="f" data-k="supplier" value="${esc(p.supplier)}" placeholder="メーカー名 / 取引先"></div>
-        <div class="field"><label>参照番号（インボイス等・手入力）</label><input class="mono f" data-k="refNo" value="${esc(p.refNo)}" placeholder="任意"></div>
-        <div class="field"><label>ステータス</label>
-          <select class="f" data-k="status">
-            <option value="unpaid" ${(p.status||"unpaid")==="unpaid"?"selected":""}>未払い</option>
-            <option value="arranging" ${p.status==="arranging"?"selected":""}>送金手配中</option>
-            <option value="paid" ${p.status==="paid"?"selected":""}>支払済</option>
+        <div class="field"><label>AWB番号</label><input class="mono f" data-k="awbNo" value="${esc(s.awbNo)}" placeholder="180-12345678"></div>
+        <div class="field"><label>仕入先</label><input class="f" data-k="supplier" value="${esc(s.supplier)}" placeholder="例：VANDS / メーカー名"></div>
+        <div class="field"><label>取引タイプ</label>
+          <select class="f" data-k="dealType">
+            <option value="normal" ${s.dealType!=="advance"?"selected":""}>通常</option>
+            <option value="advance" ${s.dealType==="advance"?"selected":""}>先出し（後でまとめて請求）</option>
           </select>
         </div>
-        <div class="field"><label>金額（記録のみ／換算なし）</label><input class="mono f" data-k="amount" inputmode="decimal" value="${esc(p.amount)}" placeholder="0"></div>
-        <div class="field"><label>通貨</label><input class="f" data-k="currency" value="${esc(p.currency)}" placeholder="USD / GBP / KRW / JPY"></div>
-        <div class="field"><label>支払予定日（期限）</label><input type="date" class="f" data-k="dueDate" value="${esc(p.dueDate)}"></div>
-        <div class="field"><label>支払日（実績）</label><input type="date" class="f" data-k="paidDate" value="${esc(p.paidDate)}"></div>
+        <div class="field"><label>発注日</label><input type="date" class="f" data-k="orderDate" value="${esc(s.orderDate)}"></div>
+        <div class="field"><label>出荷日</label><input type="date" class="f" data-k="shipDate" value="${esc(s.shipDate)}"></div>
+        <div class="field"><label>到着日</label><input type="date" class="f" data-k="arriveDate" value="${esc(s.arriveDate)}"></div>
+        <div class="field wide"><label>紐づく請求書</label>
+          <select class="f" data-k="invoiceId">
+            <option value="" ${!s.invoiceId?"selected":""}>未請求（請求書まだ）</option>
+            ${invOptions}
+            <option value="__new__">＋ この貨物で新規請求書を作成</option>
+          </select>
+          ${inv?`<div class="link-note">この貨物は <a data-goinv="${inv.id}">INV ${esc(inv.invoiceNo||"(無番号)")}</a> に含まれています。支払い管理は請求タブで。</div>`:''}
+        </div>
+        <div class="field wide"><label>メモ</label><textarea class="f" data-k="note" placeholder="通関・破損・分納などの覚書">${esc(s.note)}</textarea></div>
       </div>
 
       <div class="section">
-        <div class="section-bar"><h3>送金記録</h3></div>
-        <p class="hint">実際に送金した内容を記録します（控えは下の「支払関連書類」に添付）。</p>
-        <div class="fields" style="padding:0;border:none;">
-          <div class="field"><label>送金方法</label><input class="f" data-k="method" value="${esc(p.method)}" placeholder="銀行送金 / Wise / PayPal など"></div>
-          <div class="field"><label>送金額</label><input class="mono f" data-k="remitAmount" inputmode="decimal" value="${esc(p.remitAmount)}" placeholder="任意"></div>
-          <div class="field"><label>送金日</label><input type="date" class="f" data-k="remitDate" value="${esc(p.remitDate)}"></div>
-          <div class="field wide"><label>送金 参照番号 / 備考</label><input class="f" data-k="remitRef" value="${esc(p.remitRef)}" placeholder="送金番号・銀行参照など"></div>
+        <div class="section-bar">
+          <h3>明細 — 発注 × 到着</h3>
+          <div class="mini-btns">
+            <button class="btn-ghost" id="btnPaste">明細を貼付取込</button>
+            <button class="btn-ghost" id="btnShipCsv">CSV出力</button>
+          </div>
         </div>
+        <div class="table-scroll"><table>
+          <thead><tr><th>品名 / SKU</th><th class="num">発注数</th><th class="num">到着数</th><th>差異</th><th>備考</th><th></th></tr></thead>
+          <tbody id="itemBody">${s.items.map(itemRow).join("")}</tbody>
+        </table></div>
+        <div class="add-row"><button id="btnAddRow">＋ 行を追加</button></div>
       </div>
 
-      <div class="section">
-        <div class="section-bar"><h3>支払関連書類</h3>
-          <div class="mini-btns"><button class="btn-ghost" data-addfile>＋ 書類を添付</button></div>
-        </div>
-        <p class="hint">請求書・送金控え・領収書・銀行明細など。</p>
-        <input type="file" class="file-input" multiple style="display:none">
-        <div class="files">${filesHtml(p)}</div>
-      </div>
+      ${filesSection("ship",s)}
 
-      <div class="field wide" style="padding:18px 20px 0;"><label style="font-size:11px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;">メモ</label>
-        <textarea class="f" data-k="note" style="border:1px solid var(--line);border-radius:7px;padding:8px 10px;width:100%;resize:vertical;min-height:44px;margin-top:5px;" placeholder="支払条件・分割・特記事項など">${esc(p.note)}</textarea></div>
-
-      <div class="summary">
-        <div class="sum-item"><span class="lbl">金額</span><span class="val">${p.amount?fmtAmt(p.amount):"—"} ${esc(p.currency||"")}</span></div>
-        <div class="sum-item"><span class="lbl">送金額</span><span class="val">${p.remitAmount?fmtAmt(p.remitAmount):"—"}</span></div>
-        <div class="sum-item"><span class="lbl">期限</span><span class="val" style="font-size:15px;">${esc(p.dueDate)||"—"}</span></div>
-        <div class="sum-verdict"><span class="verdict ${st}">${st==="paid"?"✓ 支払済":st==="overdue"?"⚠ 期限超過":st==="arranging"?"… 送金手配中":"● 未払い"}</span></div>
-      </div>
+      ${shipSummary(s,st)}
     </div>`;
   }
-  function filesHtml(p){
-    const atts=p.attachments||[];
-    if(!atts.length) return '<div class="att-empty">書類は未添付。請求書・送金控え・領収書・銀行明細などを添付できます。</div>';
-    return atts.map(f=>{ const [cls,lbl]=fileIcon(f.type);
+  function itemRow(it){
+    const d=lineDiff(it); let pill;
+    if(d===null) pill='<span class="diff-pill pending">未確認</span>';
+    else if(d===0) pill='<span class="diff-pill match">✓ 一致</span>';
+    else if(d<0) pill=`<span class="diff-pill short">${d} 不足</span>`;
+    else pill=`<span class="diff-pill over">+${d} 過剰</span>`;
+    const mis=(d!==null&&d!==0)?"mismatch":"";
+    return `<tr class="${mis}" data-iid="${it.id}">
+      <td><input class="name it" data-ik="name" value="${esc(it.name)}" placeholder="品名（SKU）"></td>
+      <td class="num"><input class="qty it" data-ik="ordered" inputmode="numeric" value="${esc(it.ordered)}" placeholder="0"></td>
+      <td class="num"><input class="qty it" data-ik="arrived" inputmode="numeric" value="${esc(it.arrived)}" placeholder="—"></td>
+      <td class="diff-cell">${pill}</td>
+      <td><input class="note it" data-ik="note" value="${esc(it.note)}"></td>
+      <td><button class="row-del" title="削除">×</button></td>
+    </tr>`;
+  }
+  function filesSection(kind, ent){
+    const atts=ent.attachments||[];
+    const rows = atts.length ? atts.map(f=>{
+      const [cls,lbl]=fileIcon(f.type);
+      const canAI = /pdf|image/i.test(f.type);
       return `<div class="file-row" data-fid="${f.id}">
         <span class="file-ic ${cls}">${lbl}</span>
         <div class="file-main"><div class="file-name">${esc(f.name)}</div><div class="file-meta">${fmtSize(f.size)}・${fmtTime(f.addedAt)}</div></div>
-        <button class="btn-ghost" data-fopen="${f.id}">開く</button>
+        ${canAI?`<button class="btn-ghost file-read" data-fread="${f.id}">AI読取</button>`:''}
+        <button class="btn-ghost file-open" data-fopen="${f.id}">開く</button>
         <button class="row-del" data-fdel="${f.id}" title="削除">×</button>
-      </div>`; }).join("");
+      </div>`;
+    }).join("") : '<div class="att-empty">書類は未添付。インボイス・AWB・パッキングリスト・破損写真・通関書類などを添付できます。</div>';
+    return `<div class="section">
+      <div class="section-bar"><h3>関連書類（${atts.length}）</h3>
+        <div class="mini-btns"><button class="btn-ghost" data-addfile>＋ 書類を添付</button></div>
+      </div>
+      <input type="file" class="file-input" multiple style="display:none">
+      <div class="files">${rows}</div>
+    </div>`;
   }
-  function renderDetail(){
-    const empty=document.getElementById("detailEmpty"), c=document.getElementById("detail");
-    const p=cur();
-    if(!p){ empty.style.display="flex"; c.style.display="none"; setMobile(false); return; }
-    empty.style.display="none"; c.style.display="block"; setMobile(true);
-    c.innerHTML=detailHtml(p);
+  function shipSummary(s,st){
+    let o=0,a=0,d=0,mm=0;
+    s.items.forEach(it=>{ o+=Number(it.ordered||0); const x=lineDiff(it); if(x!==null){a+=Number(it.arrived||0);d+=x; if(x!==0)mm++;} });
+    return `<div class="summary">
+      <div class="sum-item"><span class="lbl">合計 発注</span><span class="val">${o}</span></div>
+      <div class="sum-item"><span class="lbl">合計 到着</span><span class="val">${a}</span></div>
+      <div class="sum-item"><span class="lbl">差異 合計</span><span class="val ${d<0?'short':d>0?'over':'match'}">${d>0?'+':''}${d}</span></div>
+      <div class="sum-item"><span class="lbl">不一致 行</span><span class="val ${mm?'short':'match'}">${mm}</span></div>
+      <div class="sum-verdict"><span class="verdict ${st}">${st==='match'?'✓ 全数一致':st==='diff'?'⚠ 差異あり':st==='pending'?'… 確認待ち':'明細なし'}</span></div>
+    </div>`;
+  }
+  function renderShipDetail(){
+    const empty=document.getElementById("shipEmpty"), c=document.getElementById("shipDetail");
+    const s=shipments.find(x=>x.id===selShip);
+    if(!s){ empty.style.display="flex"; c.style.display="none"; setMobile("ships",false); return; }
+    empty.style.display="none"; c.style.display="block"; setMobile("ships",true);
+    c.innerHTML=shipDetailHtml(s);
   }
 
-  function setMobile(active){
+  /* ---------- invoices list ---------- */
+  function renderInvList(){
+    const wrap=document.getElementById("invCards");
+    const f=invFilter.trim().toLowerCase();
+    const rows=invoices.filter(i=>{ if(!f) return true; return ((i.invoiceNo||"")+" "+(i.supplier||"")).toLowerCase().includes(f); })
+      .sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+    if(!rows.length){ wrap.innerHTML='<div class="empty-list">'+(invoices.length?"該当なし":"まだ請求がありません。<br>まとめ請求書が届いたら作成します。")+'</div>'; return; }
+    wrap.innerHTML=rows.map(i=>{
+      const ss=shipmentsOf(i.id); const qst=invStatus(i); const over=isOverdue(i);
+      const payClass=over?"pay-overdue":(i.payStatus==="paid"?"pay-paid":"pay-invoiced");
+      const tags=[];
+      tags.push(over?'<span class="tag overdue">期限超過</span>':`<span class="tag ${i.payStatus}">${PAY_LABEL[i.payStatus]}</span>`);
+      if(qst==="diff") tags.push('<span class="tag overdue">数量差異</span>');
+      return `<div class="card ${payClass} ${i.id===selInv?'sel':''}" data-id="${i.id}">
+        <div class="card-top"><span class="card-key">INV ${esc(i.invoiceNo)||"(無番号)"}</span><span class="badge ${qst}">${STATUS_LABEL[qst]}</span></div>
+        <div class="card-sub">${esc(i.supplier)||"仕入先未入力"}</div>
+        <div class="card-meta">${ss.length}貨物　|　${i.amount?(esc(i.amount)+" "+esc(i.currency||"")):"金額未入力"}${i.dueDate?("　|　期限 "+esc(i.dueDate)):""}</div>
+        <div class="tagrow">${tags.join("")}</div>
+      </div>`;
+    }).join("");
+  }
+
+  /* ---------- invoice detail ---------- */
+  function invDetailHtml(inv){
+    const ss=shipmentsOf(inv.id);
+    const qst=invStatus(inv); const over=isOverdue(inv);
+    let o=0,a=0,d=0,mm=0;
+    ss.forEach(s=>s.items.forEach(it=>{ o+=Number(it.ordered||0); const x=lineDiff(it); if(x!==null){a+=Number(it.arrived||0);d+=x; if(x!==0)mm++;} }));
+    const attachedHtml = ss.length ? `<div class="attached">${ss.map(s=>{
+        const st=shipStatus(s); let so=0,sa=0; s.items.forEach(it=>{so+=Number(it.ordered||0); if(lineDiff(it)!==null)sa+=Number(it.arrived||0);});
+        return `<div class="att-row st-${st}" data-goship="${s.id}">
+          <div class="att-main"><div class="att-awb">AWB ${esc(s.awbNo)||"—"}</div><div class="att-sub">${esc(s.supplier)||""}　${s.items.length}品　<span class="badge ${st}">${STATUS_LABEL[st]}</span></div></div>
+          <div class="att-qty">発注 ${so} / 到着 ${sa}</div>
+          <button class="row-del" data-detach="${s.id}" title="この請求から外す">×</button>
+        </div>`;
+      }).join("")}</div>` : '<div class="att-empty">まだ貨物が紐づいていません。下のボタンから未請求の貨物を追加します。</div>';
+
+    const unattached=shipments.filter(s=>!s.invoiceId);
+    const attachPanel = attachOpen ? `<div class="attach-panel">
+        <h4>未請求の貨物を選んで紐づけ</h4>
+        ${unattached.length? unattached.map(s=>`<label class="att-check"><input type="checkbox" data-attach="${s.id}">
+            <span><span class="a-awb">AWB ${esc(s.awbNo)||"—"}</span> <span class="a-sub">${esc(s.supplier)||""}・${s.items.length}品</span></span></label>`).join("")
+          : '<div class="att-empty">未請求の貨物はありません。</div>'}
+        ${unattached.length?'<div class="mini-btns" style="margin-top:6px;"><button class="btn-primary" id="btnAttachApply">選択を紐づける</button><button class="btn-ghost" id="btnAttachCancel">閉じる</button></div>':'<div class="mini-btns" style="margin-top:6px;"><button class="btn-ghost" id="btnAttachCancel">閉じる</button></div>'}
+      </div>` : '';
+
+    return `
+    <div class="sheet">
+      <div class="sheet-head">
+        <div>
+          <div class="stamp">Invoice / まとめ請求</div>
+          <div class="key">INV ${esc(inv.invoiceNo)||"(無番号)"}</div>
+          <div class="tagrow">
+            ${over?'<span class="tag overdue">支払期限 超過</span>':`<span class="tag ${inv.payStatus}">${PAY_LABEL[inv.payStatus]}</span>`}
+            ${qst==="diff"?'<span class="tag overdue">数量差異あり</span>':''}
+          </div>
+        </div>
+        <div class="head-actions"><span class="upd">更新 ${fmtTime(inv.updatedAt)}</span><button class="icon-btn danger" id="btnDelInv">削除</button></div>
+      </div>
+
+      <div class="fields">
+        <div class="field"><label>インボイス番号</label><input class="mono fi" data-k="invoiceNo" value="${esc(inv.invoiceNo)}" placeholder="INV-2026-001"></div>
+        <div class="field"><label>仕入先</label><input class="fi" data-k="supplier" value="${esc(inv.supplier)}" placeholder="メーカー名"></div>
+        <div class="field"><label>支払ステータス</label>
+          <select class="fi" data-k="payStatus">
+            <option value="invoiced" ${inv.payStatus!=="paid"?"selected":""}>請求済・未払い</option>
+            <option value="paid" ${inv.payStatus==="paid"?"selected":""}>支払済</option>
+          </select>
+        </div>
+        <div class="field"><label>請求書日付</label><input type="date" class="fi" data-k="invoiceDate" value="${esc(inv.invoiceDate)}"></div>
+        <div class="field"><label>支払期限</label><input type="date" class="fi" data-k="dueDate" value="${esc(inv.dueDate)}"></div>
+        <div class="field"><label>支払日</label><input type="date" class="fi" data-k="paidDate" value="${esc(inv.paidDate)}"></div>
+        <div class="field"><label>請求額（記録のみ／換算なし）</label><input class="mono fi" data-k="amount" inputmode="decimal" value="${esc(inv.amount)}" placeholder="任意"></div>
+        <div class="field"><label>通貨</label><input class="fi" data-k="currency" value="${esc(inv.currency)}" placeholder="USD / KRW / JPY"></div>
+        <div class="field wide"><label>メモ</label><textarea class="fi" data-k="note" placeholder="支払条件・送金メモなど">${esc(inv.note)}</textarea></div>
+      </div>
+
+      <div class="section">
+        <div class="section-bar">
+          <h3>紐づく貨物（${ss.length}）</h3>
+          <div class="mini-btns">
+            <button class="btn-ghost" id="btnAttachOpen">＋ 貨物を紐づけ</button>
+            <button class="btn-ghost" id="btnInvCsv">CSV出力</button>
+          </div>
+        </div>
+        ${attachedHtml}
+        ${attachPanel}
+      </div>
+
+      ${filesSection("inv",inv)}
+
+      <div class="summary">
+        <div class="sum-item"><span class="lbl">合計 発注</span><span class="val">${o}</span></div>
+        <div class="sum-item"><span class="lbl">合計 到着</span><span class="val">${a}</span></div>
+        <div class="sum-item"><span class="lbl">差異 合計</span><span class="val ${d<0?'short':d>0?'over':'match'}">${d>0?'+':''}${d}</span></div>
+        <div class="sum-item"><span class="lbl">不一致 行</span><span class="val ${mm?'short':'match'}">${mm}</span></div>
+        <div class="sum-verdict"><span class="verdict ${qst}">${qst==='match'?'✓ 数量OK 支払可':qst==='diff'?'⚠ 差異あり 要確認':qst==='pending'?'… 数量確認待ち':'貨物未紐づけ'}</span></div>
+      </div>
+    </div>`;
+  }
+  function renderInvDetail(){
+    const empty=document.getElementById("invEmpty"), c=document.getElementById("invDetail");
+    const inv=invoices.find(x=>x.id===selInv);
+    if(!inv){ empty.style.display="flex"; c.style.display="none"; setMobile("invoices",false); return; }
+    empty.style.display="none"; c.style.display="block"; setMobile("invoices",true);
+    c.innerHTML=invDetailHtml(inv);
+  }
+
+  /* ---------- helpers ---------- */
+  function curShip(){ return shipments.find(x=>x.id===selShip); }
+  function curInv(){ return invoices.find(x=>x.id===selInv); }
+  function touch(o){ o.updatedAt=Date.now(); }
+  function setMobile(tab,detailActive){
     if(window.innerWidth>880) return;
-    document.getElementById("listPane").dataset.mh=active?"1":"0";
-    document.getElementById("detailPane").dataset.mh=active?"0":"1";
+    const ids = tab==="ships" ? ["shipList","shipDetailPane"] : ["invList","invDetailPane"];
+    document.getElementById(ids[0]).dataset.mh=detailActive?"1":"0";
+    document.getElementById(ids[1]).dataset.mh=detailActive?"0":"1";
   }
   let toastTimer;
-  function toast(m,undoFn,ms){
+  function toast(m, undoFn, ms){
     const t=document.getElementById("toast");
-    t.innerHTML=esc(m)+(undoFn?' <button class="toast-undo">元に戻す</button>':'');
+    t.innerHTML = esc(m) + (undoFn?' <button class="toast-undo">元に戻す</button>':'');
     t.classList.add("show");
     if(undoFn){ t.querySelector(".toast-undo").onclick=()=>{ t.classList.remove("show"); undoFn(); }; }
-    clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"), ms||(undoFn?7000:1900));
+    clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"), ms || (undoFn?7000:1900));
   }
-  function renderAll(){ renderChips(); renderOutstanding(); renderList(); renderDetail(); }
+  function renderAll(){ renderChips(); renderShipList(); renderShipDetail(); renderInvList(); renderInvDetail(); renderReport(); }
 
-  /* ---------- CRUD ---------- */
-  function newPay(){
-    const p={id:uid(),supplier:"",refNo:"",status:"unpaid",amount:"",currency:"",dueDate:"",paidDate:"",method:"",remitAmount:"",remitDate:"",remitRef:"",note:"",attachments:[],updatedAt:Date.now()};
-    payments.push(p); selId=p.id; save(); renderAll();
-    const el=document.querySelector('#detail input[data-k="supplier"]'); if(el) el.focus();
+  /* ---------- 集計（商品×月の入庫数） ---------- */
+  let reportYear="all", reportSupplier="all", reportMode="arrived";
+  function buildReport(){
+    const noDate="日付未設定";
+    const monthsSet=new Set(), map={}, supSet=new Set(), yearSet=new Set();
+    let grand=0, shipCount=0;
+    shipments.forEach(s=>{
+      if(s.supplier) supSet.add(s.supplier);
+      const m = s.arriveDate ? s.arriveDate.slice(0,7) : noDate;
+      if(m!==noDate) yearSet.add(m.slice(0,4));
+    });
+    shipments.forEach(s=>{
+      if(reportSupplier!=="all" && (s.supplier||"")!==reportSupplier) return;
+      const m = s.arriveDate ? s.arriveDate.slice(0,7) : noDate;
+      if(reportYear!=="all"){ if(m===noDate) return; if(m.slice(0,4)!==reportYear) return; }
+      let any=false;
+      s.items.forEach(it=>{
+        const raw = reportMode==="ordered" ? it.ordered : it.arrived;
+        if(raw===""||raw==null) return;
+        const q=Number(raw)||0; if(!q) return;
+        const name=(it.name||"").trim()||"(無名)";
+        if(!map[name]) map[name]={};
+        map[name][m]=(map[name][m]||0)+q;
+        grand+=q; any=true; monthsSet.add(m);
+      });
+      if(any) shipCount++;
+    });
+    const months=[...monthsSet].filter(x=>x!==noDate).sort();
+    if(monthsSet.has(noDate)) months.push(noDate);
+    const products=Object.keys(map).sort();
+    return {months,products,map,grand,shipCount,suppliers:[...supSet].sort(),years:[...yearSet].sort().reverse(),noDate};
   }
-  function delPay(){
-    const p=cur(); if(!p) return;
-    if(!confirm("この支払案件を削除しますか？（直後なら「元に戻す」で復活できます）")) return;
-    const idx=payments.findIndex(x=>x.id===p.id);
-    const removed=payments.splice(idx,1)[0]; db.payments=payments;
-    selId=null; save(); renderAll(); supaDelete(removed.id);
-    toast("支払案件を削除しました", ()=>{
-      payments.splice(Math.min(idx,payments.length),0,removed); db.payments=payments;
-      selId=removed.id; save(); renderAll(); toast("元に戻しました");
+  function renderReport(){
+    const el=document.getElementById("view-report"); if(!el) return;
+    const r=buildReport();
+    const yearOpts=`<option value="all">すべて</option>`+r.years.map(y=>`<option value="${y}" ${reportYear===y?"selected":""}>${y}年</option>`).join("");
+    const supOpts=`<option value="all">すべて</option>`+r.suppliers.map(s=>`<option value="${esc(s)}" ${reportSupplier===s?"selected":""}>${esc(s)}</option>`).join("");
+    const modeLabel = reportMode==="ordered"?"発注数":"入庫数（到着）";
+    let body;
+    if(!r.products.length){
+      body=`<div class="report-empty">対象データがありません。<br>貨物に「到着数」と「到着日」を入れると、ここに月別の入庫集計が出ます。</div>`;
+    }else{
+      const colTotals={}; r.months.forEach(m=>colTotals[m]=0);
+      const rows=r.products.map(p=>{
+        let rowTotal=0;
+        const tds=r.months.map(m=>{ const q=r.map[p][m]||0; rowTotal+=q; colTotals[m]+=q; return `<td class="${q?'':'z'}">${q||"–"}</td>`; }).join("");
+        return `<tr><td class="prod">${esc(p)}</td>${tds}<td class="tot">${rowTotal}</td></tr>`;
+      }).join("");
+      const footCells=r.months.map(m=>`<td>${colTotals[m]}</td>`).join("");
+      body=`<div class="table-scroll" style="border:none;"><table class="pivot">
+        <thead><tr><th class="prod">商品</th>${r.months.map(m=>`<th>${m===r.noDate?m:esc(m)}</th>`).join("")}<th class="tot">合計</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><td class="prod">月合計</td>${footCells}<td class="tot">${r.grand}</td></tr></tfoot>
+      </table></div>`;
+    }
+    el.innerHTML=`<div class="report-card">
+      <div class="report-head">
+        <div><h2>入庫集計</h2><div class="sub">${modeLabel}を「到着日の月」で集計。商品名ごとに合算します。</div></div>
+        <div class="rep-field"><label>集計対象</label>
+          <select id="repMode"><option value="arrived" ${reportMode==="arrived"?"selected":""}>入庫数（到着）</option><option value="ordered" ${reportMode==="ordered"?"selected":""}>発注数</option></select></div>
+        <div class="rep-field"><label>年</label><select id="repYear">${yearOpts}</select></div>
+        <div class="rep-field"><label>仕入先</label><select id="repSup">${supOpts}</select></div>
+        <div class="rep-spacer"></div>
+        <div class="rep-field"><label>&nbsp;</label><button class="btn-ghost" id="repCsv">CSV出力</button></div>
+      </div>
+      <div class="report-body">${body}</div>
+    </div>`;
+  }
+  function reportCsv(){
+    const r=buildReport();
+    if(!r.products.length){ toast("出力するデータがありません"); return; }
+    const head=["商品",...r.months,"合計"];
+    const lines=[head];
+    r.products.forEach(p=>{ let t=0; const row=[p]; r.months.forEach(m=>{ const q=r.map[p][m]||0; t+=q; row.push(q); }); row.push(t); lines.push(row); });
+    const footer=["月合計"]; r.months.forEach(m=>{ let c=0; r.products.forEach(p=>c+=(r.map[p][m]||0)); footer.push(c); }); footer.push(r.grand);
+    lines.push(footer);
+    downloadCsv(lines, "入庫集計_"+(reportMode==="ordered"?"発注":"入庫")+"_"+(reportYear==="all"?"全期間":reportYear));
+  }
+
+  function switchTab(tab){
+    activeTab=tab;
+    document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));
+    document.getElementById("view-ships").style.display = tab==="ships"?"grid":"none";
+    document.getElementById("view-invoices").style.display = tab==="invoices"?"grid":"none";
+    document.getElementById("view-report").style.display = tab==="report"?"block":"none";
+    if(tab==="report") renderReport();
+    renderChips();
+  }
+
+  /* ---------- shipment actions ---------- */
+  function newShip(){
+    const s={id:uid(),awbNo:"",supplier:"",dealType:"normal",invoiceId:null,orderDate:"",shipDate:"",arriveDate:"",note:"",items:[{id:uid(),name:"",ordered:"",arrived:"",note:""}],attachments:[],updatedAt:Date.now()};
+    shipments.push(s); selShip=s.id; save(); renderAll();
+    const el=document.querySelector('#shipDetail input[data-k="awbNo"]'); if(el) el.focus();
+  }
+  function delShip(){
+    const s=curShip(); if(!s) return;
+    if(!confirm("この貨物を削除しますか？（直後なら「元に戻す」で復活できます）")) return;
+    const idx=shipments.findIndex(x=>x.id===s.id);
+    const removed=shipments.splice(idx,1)[0]; db.shipments=shipments;
+    selShip=null; save(); renderAll(); supaDelete(removed.id);
+    toast("貨物を削除しました", ()=>{
+      shipments.splice(Math.min(idx,shipments.length),0,removed); db.shipments=shipments;
+      selShip=removed.id; save(); switchTab("ships"); renderAll(); toast("元に戻しました");
     });
   }
 
-  /* ---------- files ---------- */
-  async function handleFiles(fileList){
-    const p=cur(); if(!p||!fileList.length) return;
-    if(!p.attachments) p.attachments=[];
+  function addRow(){
+    const s=curShip(); if(!s) return;
+    s.items.push({id:uid(),name:"",ordered:"",arrived:"",note:""}); touch(s); save(); renderShipDetail();
+    const rows=document.querySelectorAll("#itemBody tr"); const last=rows[rows.length-1]; if(last) last.querySelector("input.name").focus();
+  }
+  function shipCsv(){
+    const s=curShip(); if(!s) return;
+    const inv=invoiceOf(s);
+    const head=["AWB","仕入先","取引","インボイス","支払状態","品名","発注数","到着数","差異","数量状態","備考"];
+    const lines=[head];
+    s.items.forEach(it=>{ const d=lineDiff(it); const st=d===null?"未確認":d===0?"一致":d<0?"不足":"過剰";
+      lines.push([s.awbNo,s.supplier,s.dealType==="advance"?"先出し":"通常",inv?inv.invoiceNo:"未請求",inv?PAY_LABEL[inv.payStatus]:"-",it.name,it.ordered,it.arrived,(d===null?"":d),st,it.note]); });
+    downloadCsv(lines, "照合_AWB_"+(s.awbNo||"貨物"));
+  }
+
+  /* ---------- invoice actions ---------- */
+  function newInv(supplier){
+    const i={id:uid(),invoiceNo:"",supplier:supplier||"",payStatus:"invoiced",invoiceDate:"",dueDate:"",paidDate:"",amount:"",currency:"",note:"",attachments:[],updatedAt:Date.now()};
+    invoices.push(i); save(); return i;
+  }
+  function delInv(){
+    const inv=curInv(); if(!inv) return;
+    if(!confirm("この請求を削除しますか？紐づく貨物は『未請求』に戻ります。（直後なら「元に戻す」可）")) return;
+    const linked=shipmentsOf(inv.id).map(s=>s.id);
+    linked.forEach(id=>{ const s=shipments.find(x=>x.id===id); if(s){ s.invoiceId=null; touch(s); } });
+    const idx=invoices.findIndex(x=>x.id===inv.id);
+    const removed=invoices.splice(idx,1)[0]; db.invoices=invoices;
+    selInv=null; save(); renderAll(); supaDelete(removed.id);
+    toast("請求を削除しました", ()=>{
+      invoices.splice(Math.min(idx,invoices.length),0,removed); db.invoices=invoices;
+      linked.forEach(id=>{ const s=shipments.find(x=>x.id===id); if(s){ s.invoiceId=removed.id; touch(s); } });
+      selInv=removed.id; save(); switchTab("invoices"); renderAll(); toast("元に戻しました");
+    });
+  }
+  function invCsv(){
+    const inv=curInv(); if(!inv) return;
+    const ss=shipmentsOf(inv.id);
+    const head=["インボイス","仕入先","支払状態","支払期限","請求額","通貨","AWB","品名","発注数","到着数","差異","数量状態"];
+    const lines=[head];
+    ss.forEach(s=>s.items.forEach(it=>{ const d=lineDiff(it); const st=d===null?"未確認":d===0?"一致":d<0?"不足":"過剰";
+      lines.push([inv.invoiceNo,inv.supplier,PAY_LABEL[inv.payStatus],inv.dueDate,inv.amount,inv.currency,s.awbNo,it.name,it.ordered,it.arrived,(d===null?"":d),st]); }));
+    downloadCsv(lines, "請求_"+(inv.invoiceNo||"INV"));
+  }
+
+  function downloadCsv(lines, name){
+    const csv=lines.map(r=>r.map(c=>{ c=(c==null)?"":String(c); return /[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c; }).join(",")).join("\r\n");
+    const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name.replace(/[^\w\-]/g,"_")+".csv"; a.click(); URL.revokeObjectURL(a.href);
+    toast("CSVを書き出しました");
+  }
+
+  /* ---------- attachments ---------- */
+  async function handleFiles(fileList, kind){
+    const ent = kind==="ship"?curShip():curInv(); if(!ent || !fileList.length) return;
+    if(!ent.attachments) ent.attachments=[];
     let n=0;
     for(const file of fileList){
       const id=uid();
       try{ await IDB.put({id,name:file.name,type:file.type,size:file.size,blob:file}); }
       catch(err){ toast("書類を保存できませんでした（プレビューでは保存不可）"); return; }
       let remote=false; try{ remote=await supaUpload(id,file,file.type); }catch(e){}
-      p.attachments.push({id,name:file.name,type:file.type||"",size:file.size,addedAt:Date.now(),remote:remote}); n++;
+      ent.attachments.push({id,name:file.name,type:file.type||"",size:file.size,addedAt:Date.now(),remote:remote}); n++;
     }
-    touch(p); save(); renderDetail(); renderList();
+    touch(ent); save();
+    if(kind==="ship"){ renderShipDetail(); renderShipList(); } else { renderInvDetail(); renderInvList(); }
     toast(n+"件の書類を添付しました");
   }
   async function openFile(id){
@@ -520,24 +1007,25 @@
     if(supaOn()){ window.open(supaFileUrl(id),"_blank"); return; }
     toast("ファイルが見つかりません");
   }
-  async function delFile(id){
-    const p=cur(); if(!p) return;
+  async function delFile(kind,id){
+    const ent = kind==="ship"?curShip():curInv(); if(!ent) return;
     if(!confirm("この書類を削除します。よろしいですか？")) return;
-    p.attachments=(p.attachments||[]).filter(f=>f.id!==id); touch(p); save();
+    ent.attachments=(ent.attachments||[]).filter(f=>f.id!==id); touch(ent); save();
     try{ await IDB.del(id); }catch(e){}
     supaFileDelete(id);
-    renderDetail();
+    if(kind==="ship"){ renderShipDetail(); } else { renderInvDetail(); }
     toast("書類を削除しました");
   }
 
   /* ---------- backup / restore ---------- */
   async function doBackup(){
     let files=[];
-    try{ const recs=await IDB.all(); for(const r of recs){ files.push({id:r.id,name:r.name,type:r.type,size:r.size,dataB64:await blobToB64(r.blob)}); } }catch(e){}
-    const payload={app:"payments",version:1,exportedAt:new Date().toISOString(),db:{payments},files};
+    try{ const recs=await IDB.all(); for(const r of recs){ files.push({id:r.id,name:r.name,type:r.type,size:r.size,dataB64:await blobToB64(r.blob)}); } }
+    catch(e){ /* IndexedDB unavailable — back up data only */ }
+    const payload={app:"cargo-recon",version:2,exportedAt:new Date().toISOString(),db:{shipments,invoices},files};
     const blob=new Blob([JSON.stringify(payload)],{type:"application/json"});
     const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
-    a.download="payments-backup_"+new Date().toISOString().slice(0,10)+".json"; a.click(); URL.revokeObjectURL(a.href);
+    a.download="cargo-recon-backup_"+new Date().toISOString().slice(0,10)+".json"; a.click(); URL.revokeObjectURL(a.href);
     db.lastBackup=Date.now(); save(); renderBackupState();
     toast("バックアップを書き出しました（書類 "+files.length+"件含む）");
   }
@@ -545,55 +1033,329 @@
     const reader=new FileReader();
     reader.onload=async()=>{
       let p; try{ p=JSON.parse(reader.result); }catch(e){ toast("ファイルを読み取れませんでした"); return; }
-      if(!p||!p.db||!p.db.payments){ toast("対応していないバックアップ形式です"); return; }
-      if(!confirm(`現在のデータを、このバックアップ（支払${(p.db.payments||[]).length}件）で上書きします。よろしいですか？`)) return;
-      payments.length=0; (p.db.payments||[]).forEach(x=>payments.push(x)); db.payments=payments;
+      if(!p || !p.db){ toast("対応していないバックアップ形式です"); return; }
+      const sc=(p.db.shipments||[]).length, ic=(p.db.invoices||[]).length;
+      if(!confirm(`現在のデータを、このバックアップ（貨物${sc}件・請求${ic}件）で上書きします。よろしいですか？`)) return;
+      shipments.length=0; (p.db.shipments||[]).forEach(x=>shipments.push(x)); db.shipments=shipments;
+      invoices.length=0; (p.db.invoices||[]).forEach(x=>invoices.push(x)); db.invoices=invoices;
       if(p.db.lastBackup) db.lastBackup=p.db.lastBackup;
       try{ for(const f of (p.files||[])){ await IDB.put({id:f.id,name:f.name,type:f.type,size:f.size,blob:b64ToBlob(f.dataB64,f.type)}); } }catch(e){}
-      selId=null; save(); renderAll(); renderBackupState();
+      selShip=null; selInv=null; save(); renderAll(); renderBackupState();
       toast("バックアップから復元しました");
     };
     reader.readAsText(file);
   }
   function renderBackupState(){
     const el=document.getElementById("backupState"); if(!el) return;
-    if(!db.lastBackup){ el.textContent="未バックアップ"; el.className="state warn"; return; }
+    if(!db.lastBackup){ el.textContent="未バックアップ"; el.className="backup-state warn"; return; }
     const days=Math.floor((Date.now()-db.lastBackup)/86400000);
-    el.textContent="最終BU "+fmtDate(db.lastBackup)+(days>=7?"・要更新":""); el.className="state"+(days>=7?" warn":"");
+    el.textContent="最終BU "+fmtDate(db.lastBackup)+(days>=7?"・要更新":"");
+    el.className="backup-state"+(days>=7?" warn":"");
   }
 
-  /* ---------- events ---------- */
+  /* ---------- AI document reading (Claude Vision) ---------- */
+  const AIKEY="cargo-recon-aikey";
+  function getKey(){ try{ return localStorage.getItem(AIKEY)||""; }catch(e){ return ""; } }
+  function setKey(k){ try{ if(k) localStorage.setItem(AIKEY,k); else localStorage.removeItem(AIKEY); }catch(e){} }
+
+  const EXTRACT_PROMPT = `You are extracting structured data from an international shipping document (a commercial invoice or an air waybill) used for cargo import reconciliation. These documents come from MANY DIFFERENT suppliers, so layouts, column labels, fonts, languages, and number formats vary widely. Do NOT rely on fixed positions — read the document semantically. Return ONLY a JSON object — no markdown, no code fences, no commentary.
+
+Schema:
+{
+  "docType": "invoice" | "waybill" | "other",
+  "awbNo": string|null,
+  "invoiceNo": string|null,
+  "invoiceDate": string|null,
+  "supplier": string|null,
+  "currency": string|null,
+  "amount": string|null,
+  "pieces": string|null,
+  "weightKg": string|null,
+  "items": [ { "name": string, "ordered": number } ],
+  "warnings": [ string ]
+}
+
+Rules:
+- awbNo: Air Waybill / tracking number, digits only (strip spaces and dashes).
+- invoiceDate: normalise to YYYY-MM-DD regardless of the source format.
+- supplier: the shipper / seller / ship-from company name.
+- currency: 3-letter ISO code (GBP, USD, EUR, KRW, JPY...). Infer from symbols if no code is shown.
+- amount: the grand total invoice amount (or, for a waybill, the declared customs value). Output digits only with a dot decimal and NO thousands separators (e.g. "28250.00"). Handle both 1,234.56 and 1.234,56 styles.
+- items: ONLY commercial-invoice line items; each is one product (description + quantity).
+- "ordered": the number of UNITS for that line (the ordered/shipped piece count) — NOT weight, carton count, pallet count, or unit price.
+- For a waybill, items must be [] (waybills rarely list per-product quantities).
+- Keep product names exactly as written, in their original language.
+- warnings: short notes about anything ambiguous, unclear, partially legible, or guessed (e.g. "QTY column ambiguous", "total partly illegible"). Empty array if fully confident.
+- Use null for any field not present. Never invent values.`;
+
+  async function extractDoc(blob, mediaType){
+    const b64=await blobToB64(blob);
+    const key=getKey();
+    const headers={"content-type":"application/json"};
+    if(key){ headers["x-api-key"]=key; headers["anthropic-version"]="2023-06-01"; headers["anthropic-dangerous-direct-browser-access"]="true"; }
+    const isPdf=/pdf/i.test(mediaType);
+    const source={type:"base64", media_type:isPdf?"application/pdf":(mediaType||"image/png"), data:b64};
+    const docBlock=isPdf?{type:"document",source}:{type:"image",source};
+    const body={model:"claude-sonnet-4-6",max_tokens:4096,messages:[{role:"user",content:[docBlock,{type:"text",text:EXTRACT_PROMPT}]}]};
+    const resp=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers,body:JSON.stringify(body)});
+    if(!resp.ok){ let t=""; try{ t=await resp.text(); }catch(e){} throw new Error("API "+resp.status+(t?(" "+t.slice(0,140)):"")); }
+    const data=await resp.json();
+    const text=(data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n");
+    return parseJsonLoose(text);
+  }
+  function parseJsonLoose(text){
+    let t=String(text||"").replace(/```json|```/g,"").trim();
+    try{ return JSON.parse(t); }catch(e){}
+    const a=t.indexOf("{"), b=t.lastIndexOf("}");
+    if(a>=0 && b>a){ try{ return JSON.parse(t.slice(a,b+1)); }catch(e){} }
+    throw new Error("読み取り結果を解析できませんでした（書類が長すぎる/不鮮明な可能性）");
+  }
+
+  let exState=null;
+  function exEnt(){ if(!exState) return null; return exState.kind==="ship"?shipments.find(x=>x.id===exState.entId):invoices.find(x=>x.id===exState.entId); }
   function showModal(id){ document.getElementById(id).classList.add("open"); }
   function hideModal(id){ document.getElementById(id).classList.remove("open"); }
+  function setExBody(h){ document.getElementById("exBody").innerHTML=h; }
+  function setExFoot(h){ document.getElementById("exFoot").innerHTML=h; }
 
-  document.getElementById("btnNew").addEventListener("click",newPay);
-  document.getElementById("search").addEventListener("input",e=>{ filter=e.target.value; renderList(); });
-  document.getElementById("cards").addEventListener("click",e=>{ const c=e.target.closest(".card"); if(!c) return; selId=c.dataset.id; renderList(); renderDetail(); });
+  async function startExtract(kind, fid){
+    const ent = kind==="ship"?curShip():curInv(); if(!ent) return;
+    const meta=(ent.attachments||[]).find(f=>f.id===fid); if(!meta) return;
+    exState={kind, entId:ent.id, fid, result:null};
+    showModal("extractModal");
+    setExBody('<div class="ex-spinner"><span class="spin"></span>AIが書類を読み取っています…</div>');
+    setExFoot('<button class="btn-ghost" id="exCancel">キャンセル</button>');
+    try{
+      const blob=await getAttachmentBlob(fid); if(!blob) throw new Error("ファイルが見つかりません");
+      exState.result=await extractDoc(blob, meta.type||"application/pdf");
+      renderExtractResult();
+    }catch(err){
+      setExBody('<div class="ex-warn">読み取れませんでした。<br>'+esc(err.message||String(err))+'</div>'
+        +'<p style="font-size:12.5px;color:#5b6776;">APIキーが未設定の可能性があります。上部「AI設定」でキーを登録するか、Claude.ai内でこのツールを開いてお試しください。</p>');
+      setExFoot('<button class="btn-ghost" id="exCancel">閉じる</button>');
+    }
+  }
 
-  document.getElementById("detail").addEventListener("input",e=>{
-    const p=cur(); if(!p||!e.target.classList.contains("f")) return;
-    const k=e.target.dataset.k;
-    p[k]=e.target.value; touch(p); save();
-    if(["supplier","refNo","amount","currency","dueDate","paidDate"].includes(k)){ renderList(); renderChips(); renderOutstanding(); }
+  function renderExtractResult(){
+    const r=exState.result||{}, kind=exState.kind, ent=exEnt(); if(!ent){ hideModal("extractModal"); return; }
+    const v=x=>x==null?"":x;
+    const exF=(label,id,val,cur)=>{
+      const conflict = cur && String(cur).trim() && val && String(cur).trim()!==String(val).trim();
+      return `<div class="ex-field ${conflict?'conflict':''}"><label>${label}</label>
+        <input type="text" id="${id}" value="${esc(val)}">${conflict?`<div class="ex-conflict-note">⚠ 現在値「${esc(cur)}」と相違</div>`:''}</div>`;
+    };
+    const typeLbl = r.docType==="invoice"?"インボイス":r.docType==="waybill"?"AWB / 貨物状":"書類";
+    const warns=Array.isArray(r.warnings)?r.warnings.filter(Boolean):[];
+    let html = warns.length ? `<div class="ex-note">⚠ AIが要確認とした項目：${warns.map(esc).join(" ／ ")}</div>` : "";
+    html += `<p style="margin:0 0 12px;color:#5b6776;font-size:13px;">種別：<b>${typeLbl}</b>　内容を確認・修正してから反映してください。赤枠は既存値との相違です。</p>`;
+    if(kind==="ship"){
+      const inv=invoiceOf(ent);
+      html+=`<div class="ex-grid">${exF("AWB番号","ex_awb",v(r.awbNo),ent.awbNo)}${exF("仕入先","ex_supplier",v(r.supplier),ent.supplier)}</div>`;
+      const items=Array.isArray(r.items)?r.items:[];
+      html+=`<div class="ex-items"><label style="font-size:11px;font-weight:600;color:#5b6776;text-transform:uppercase;letter-spacing:.04em;">明細（チェックした行を取り込み）</label>`;
+      if(items.length){ items.forEach(it=>{ html+=`<div class="ex-item"><input type="checkbox" checked><input type="text" value="${esc(it.name||'')}"><input type="number" value="${esc(it.ordered!=null?it.ordered:'')}"></div>`; }); }
+      else html+='<div class="att-empty" style="margin-top:6px;">明細は読み取れませんでした（AWBには通常ありません）。</div>';
+      html+=`</div>`;
+      html+=`<div style="margin-top:16px;border-top:1px solid var(--line-soft);padding-top:12px;"><label style="font-size:11px;font-weight:600;color:#5b6776;text-transform:uppercase;letter-spacing:.04em;">請求情報（任意）</label>
+        <div class="ex-grid" style="margin-top:8px;">${exF("インボイス番号","ex_invno",v(r.invoiceNo),inv?inv.invoiceNo:"")}${exF("インボイス日付","ex_invdate",v(r.invoiceDate),inv?inv.invoiceDate:"")}${exF("通貨","ex_cur",v(r.currency),inv?inv.currency:"")}${exF("金額","ex_amt",v(r.amount),inv?inv.amount:"")}</div>
+        <label class="ex-opt"><input type="checkbox" id="ex_makeInv" ${r.invoiceNo?"checked":""}> ${inv?"紐づく請求書も更新する":"請求書も作成して反映する"}</label></div>`;
+    }else{
+      html+=`<div class="ex-grid">${exF("インボイス番号","ex_invno",v(r.invoiceNo),ent.invoiceNo)}${exF("仕入先","ex_supplier",v(r.supplier),ent.supplier)}${exF("インボイス日付","ex_invdate",v(r.invoiceDate),ent.invoiceDate)}${exF("通貨","ex_cur",v(r.currency),ent.currency)}${exF("金額","ex_amt",v(r.amount),ent.amount)}</div>`;
+      if(Array.isArray(r.items)&&r.items.length) html+=`<p style="font-size:12px;color:#8a94a2;margin-top:10px;">※ 明細（${r.items.length}品）は貨物側の「AI読取」で取り込んでください。</p>`;
+    }
+    setExBody(html);
+    setExFoot('<button class="btn-ghost" id="exCancel">キャンセル</button><button class="btn-primary" id="exApply">反映する</button>');
+  }
+
+  function applyExtract(){
+    const kind=exState.kind, ent=exEnt(); if(!ent){ hideModal("extractModal"); return; }
+    const val=id=>{ const e=document.getElementById(id); return e?e.value.trim():""; };
+    if(kind==="ship"){
+      if(val("ex_awb")) ent.awbNo=val("ex_awb");
+      if(val("ex_supplier")) ent.supplier=val("ex_supplier");
+      const items=[];
+      document.querySelectorAll("#exBody .ex-item").forEach(row=>{
+        const ck=row.querySelector('input[type=checkbox]'); if(!ck||!ck.checked) return;
+        const name=row.querySelector('input[type=text]').value.trim();
+        const q=row.querySelector('input[type=number]').value.trim();
+        if(name) items.push({id:uid(),name,ordered:q,arrived:"",note:""});
+      });
+      if(items.length){ const blank=ent.items.every(it=>!it.name&&it.ordered===""&&it.arrived===""); ent.items=blank?items:ent.items.concat(items); }
+      const mk=document.getElementById("ex_makeInv");
+      if(mk&&mk.checked){
+        let inv=invoiceOf(ent); if(!inv){ inv=newInv(ent.supplier); ent.invoiceId=inv.id; }
+        if(val("ex_invno")) inv.invoiceNo=val("ex_invno");
+        if(val("ex_invdate")) inv.invoiceDate=val("ex_invdate");
+        if(val("ex_cur")) inv.currency=val("ex_cur");
+        if(val("ex_amt")) inv.amount=val("ex_amt");
+        if(!inv.supplier&&ent.supplier) inv.supplier=ent.supplier;
+        touch(inv);
+      }
+      touch(ent); save(); renderAll(); hideModal("extractModal"); toast("読み取り内容を反映しました");
+    }else{
+      if(val("ex_invno")) ent.invoiceNo=val("ex_invno");
+      if(val("ex_supplier")) ent.supplier=val("ex_supplier");
+      if(val("ex_invdate")) ent.invoiceDate=val("ex_invdate");
+      if(val("ex_cur")) ent.currency=val("ex_cur");
+      if(val("ex_amt")) ent.amount=val("ex_amt");
+      touch(ent); save(); renderAll(); hideModal("extractModal"); toast("読み取り内容を反映しました");
+    }
+  }
+
+  /* ---------- paste import (shipment items) ---------- */
+  function openModal(){ document.getElementById("pasteArea").value=""; document.getElementById("modalBg").classList.add("open"); document.getElementById("pasteArea").focus(); }
+  function closeModal(){ document.getElementById("modalBg").classList.remove("open"); }
+  function applyPaste(){
+    const s=curShip(); if(!s){ closeModal(); return; }
+    const lines=document.getElementById("pasteArea").value.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+    if(!lines.length){ closeModal(); return; }
+    s.items=s.items.filter(it=>it.name||it.ordered!==""||it.arrived!=="");
+    let added=0;
+    lines.forEach(l=>{ const p=l.split(/\t|,/).map(x=>x.trim()); const name=p[0]||""; if(!name) return;
+      const ordered=(p[1]!==undefined&&p[1]!=="")?p[1].replace(/[^\d.-]/g,""):""; s.items.push({id:uid(),name,ordered,arrived:"",note:""}); added++; });
+    if(!s.items.length) s.items.push({id:uid(),name:"",ordered:"",arrived:"",note:""});
+    touch(s); save(); closeModal(); renderShipDetail(); renderShipList(); renderChips(); toast(added+"品を取り込みました");
+  }
+
+  /* ================= EVENTS ================= */
+  document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));
+  document.getElementById("btnNewShip").addEventListener("click",newShip);
+  document.getElementById("btnNewInv").addEventListener("click",()=>{ const i=newInv(); selInv=i.id; attachOpen=false; renderAll(); const el=document.querySelector('#invDetail input[data-k="invoiceNo"]'); if(el) el.focus(); });
+  document.getElementById("shipSearch").addEventListener("input",e=>{ shipFilter=e.target.value; renderShipList(); });
+  document.getElementById("invSearch").addEventListener("input",e=>{ invFilter=e.target.value; renderInvList(); });
+
+  document.getElementById("shipCards").addEventListener("click",e=>{ const c=e.target.closest(".card"); if(!c) return; selShip=c.dataset.id; renderShipList(); renderShipDetail(); });
+  document.getElementById("invCards").addEventListener("click",e=>{ const c=e.target.closest(".card"); if(!c) return; selInv=c.dataset.id; attachOpen=false; renderInvList(); renderInvDetail(); });
+
+  /* shipment detail: text inputs */
+  document.getElementById("shipDetail").addEventListener("input",e=>{
+    const s=curShip(); if(!s) return;
+    if(e.target.classList.contains("f")){
+      const k=e.target.dataset.k; if(k==="invoiceId") return; // handled on change
+      s[k]=e.target.value; touch(s); save();
+      if(["awbNo","supplier"].includes(k)) renderShipList();
+    }
+    if(e.target.classList.contains("it")){
+      const tr=e.target.closest("tr"); const it=s.items.find(x=>x.id===tr.dataset.iid); if(!it) return;
+      it[e.target.dataset.ik]=e.target.value; touch(s); save();
+      updateShipRow(tr,it); updateShipSummary(s); renderChips(); renderShipList();
+    }
   });
-  document.getElementById("detail").addEventListener("change",e=>{
-    if(e.target.classList.contains("file-input")){ handleFiles(e.target.files); e.target.value=""; return; }
+  /* shipment detail: selects + dates */
+  document.getElementById("shipDetail").addEventListener("change",e=>{
+    if(e.target.classList.contains("file-input")){ handleFiles(e.target.files,"ship"); e.target.value=""; return; }
     if(!e.target.classList.contains("f")) return;
     if(!(e.target.tagName==="SELECT"||e.target.type==="date")) return;
-    const p=cur(); if(!p) return;
-    p[e.target.dataset.k]=e.target.value; touch(p); save(); renderDetail(); renderList(); renderChips(); renderOutstanding();
+    const s=curShip(); if(!s) return;
+    const k=e.target.dataset.k;
+    if(k==="invoiceId"){
+      const v=e.target.value;
+      if(v==="__new__"){ const i=newInv(s.supplier); s.invoiceId=i.id; }
+      else s.invoiceId = v || null;
+    }else{ s[k]=e.target.value; }
+    touch(s); save(); renderShipDetail(); renderShipList(); renderInvList(); renderChips();
   });
-  document.getElementById("detail").addEventListener("click",e=>{
-    if(e.target.id==="btnDel") return delPay();
+  /* shipment detail: clicks */
+  document.getElementById("shipDetail").addEventListener("click",e=>{
+    if(e.target.id==="btnDelShip") return delShip();
+    if(e.target.id==="btnAddRow") return addRow();
+    if(e.target.id==="btnShipCsv") return shipCsv();
+    if(e.target.id==="btnPaste") return openModal();
     if(e.target.dataset.addfile!==undefined){ const inp=e.currentTarget.querySelector(".file-input"); if(inp) inp.click(); return; }
+    if(e.target.dataset.fread) return startExtract("ship", e.target.dataset.fread);
     if(e.target.dataset.fopen) return openFile(e.target.dataset.fopen);
-    if(e.target.dataset.fdel) return delFile(e.target.dataset.fdel);
+    if(e.target.dataset.fdel) return delFile("ship", e.target.dataset.fdel);
+    if(e.target.dataset.goinv){ selInv=e.target.dataset.goinv; switchTab("invoices"); renderInvList(); renderInvDetail(); return; }
+    if(e.target.classList.contains("row-del")){
+      const s=curShip(); const tr=e.target.closest("tr");
+      s.items=s.items.filter(x=>x.id!==tr.dataset.iid);
+      if(!s.items.length) s.items.push({id:uid(),name:"",ordered:"",arrived:"",note:""});
+      touch(s); save(); renderShipDetail(); renderShipList(); renderChips();
+    }
   });
+
+  function updateShipRow(tr,it){
+    const d=lineDiff(it); let pill;
+    if(d===null) pill='<span class="diff-pill pending">未確認</span>';
+    else if(d===0) pill='<span class="diff-pill match">✓ 一致</span>';
+    else if(d<0) pill=`<span class="diff-pill short">${d} 不足</span>`;
+    else pill=`<span class="diff-pill over">+${d} 過剰</span>`;
+    tr.querySelector(".diff-cell").innerHTML=pill; tr.classList.toggle("mismatch",d!==null&&d!==0);
+  }
+  function updateShipSummary(s){
+    let o=0,a=0,d=0,mm=0; s.items.forEach(it=>{ o+=Number(it.ordered||0); const x=lineDiff(it); if(x!==null){a+=Number(it.arrived||0);d+=x; if(x!==0)mm++;} });
+    const st=shipStatus(s); const sum=document.querySelector("#shipDetail .summary"); if(!sum) return;
+    const v=sum.querySelectorAll(".sum-item .val");
+    v[0].textContent=o; v[1].textContent=a;
+    v[2].textContent=(d>0?'+':'')+d; v[2].className="val "+(d<0?'short':d>0?'over':'match');
+    v[3].textContent=mm; v[3].className="val "+(mm?'short':'match');
+    const vd=sum.querySelector(".verdict"); vd.className="verdict "+st;
+    vd.textContent= st==='match'?'✓ 全数一致':st==='diff'?'⚠ 差異あり':st==='pending'?'… 確認待ち':'明細なし';
+  }
+
+  /* invoice detail: text inputs */
+  document.getElementById("invDetail").addEventListener("input",e=>{
+    const inv=curInv(); if(!inv||!e.target.classList.contains("fi")) return;
+    inv[e.target.dataset.k]=e.target.value; touch(inv); save();
+    if(["invoiceNo","supplier","amount","currency"].includes(e.target.dataset.k)) renderInvList();
+  });
+  /* invoice detail: selects + dates */
+  document.getElementById("invDetail").addEventListener("change",e=>{
+    if(e.target.classList.contains("file-input")){ handleFiles(e.target.files,"inv"); e.target.value=""; return; }
+    if(!e.target.classList.contains("fi")) return;
+    if(!(e.target.tagName==="SELECT"||e.target.type==="date")) return;
+    const inv=curInv(); if(!inv) return;
+    inv[e.target.dataset.k]=e.target.value; touch(inv); save();
+    renderInvDetail(); renderInvList(); renderChips(); renderShipList();
+  });
+  /* invoice detail: clicks */
+  document.getElementById("invDetail").addEventListener("click",e=>{
+    if(e.target.id==="btnDelInv") return delInv();
+    if(e.target.id==="btnInvCsv") return invCsv();
+    if(e.target.dataset.addfile!==undefined){ const inp=e.currentTarget.querySelector(".file-input"); if(inp) inp.click(); return; }
+    if(e.target.dataset.fread) return startExtract("inv", e.target.dataset.fread);
+    if(e.target.dataset.fopen) return openFile(e.target.dataset.fopen);
+    if(e.target.dataset.fdel) return delFile("inv", e.target.dataset.fdel);
+    if(e.target.id==="btnAttachOpen"){ attachOpen=true; renderInvDetail(); return; }
+    if(e.target.id==="btnAttachCancel"){ attachOpen=false; renderInvDetail(); return; }
+    if(e.target.id==="btnAttachApply"){
+      const inv=curInv(); const boxes=document.querySelectorAll('#invDetail input[data-attach]:checked');
+      let n=0; boxes.forEach(b=>{ const s=shipments.find(x=>x.id===b.dataset.attach); if(s){ s.invoiceId=inv.id; if(!s.supplier&&inv.supplier)s.supplier=inv.supplier; touch(s); n++; } });
+      attachOpen=false; save(); renderAll(); toast(n+"貨物を紐づけました"); return;
+    }
+    if(e.target.dataset.detach){
+      const s=shipments.find(x=>x.id===e.target.dataset.detach); if(s){ s.invoiceId=null; touch(s); save(); renderInvDetail(); renderInvList(); renderShipList(); renderChips(); }
+      return;
+    }
+    const row=e.target.closest(".att-row");
+    if(row && row.dataset.goship){ selShip=row.dataset.goship; switchTab("ships"); renderShipList(); renderShipDetail(); }
+  });
+
+  /* modal */
+  document.getElementById("modalClose").addEventListener("click",closeModal);
+  document.getElementById("pasteCancel").addEventListener("click",closeModal);
+  document.getElementById("pasteApply").addEventListener("click",applyPaste);
+  document.getElementById("modalBg").addEventListener("click",e=>{ if(e.target.id==="modalBg") closeModal(); });
+
+  /* AI settings + extraction modals */
+  document.getElementById("btnAI").addEventListener("click",()=>{ document.getElementById("aiKeyInput").value=getKey(); showModal("aiModal"); });
+  document.getElementById("aiClose").addEventListener("click",()=>hideModal("aiModal"));
+  document.getElementById("aiSave").addEventListener("click",()=>{ setKey(document.getElementById("aiKeyInput").value.trim()); hideModal("aiModal"); toast("AI設定を保存しました"); });
+  document.getElementById("aiClear").addEventListener("click",()=>{ setKey(""); document.getElementById("aiKeyInput").value=""; toast("キーを削除しました"); });
+  document.getElementById("aiModal").addEventListener("click",e=>{ if(e.target.id==="aiModal") hideModal("aiModal"); });
+  document.getElementById("extractModal").addEventListener("click",e=>{
+    if(e.target.id==="extractModal"||e.target.id==="exClose"||e.target.id==="exCancel") return hideModal("extractModal");
+    if(e.target.id==="exApply") return applyExtract();
+  });
+
+  window.addEventListener("keydown",e=>{ if(e.key==="Escape"){ closeModal(); hideModal("aiModal"); hideModal("extractModal"); hideModal("supaModal"); } });
+  window.addEventListener("resize",()=>{ setMobile("ships",!!selShip); setMobile("invoices",!!selInv); });
 
   document.getElementById("btnBackup").addEventListener("click",doBackup);
   document.getElementById("btnRestore").addEventListener("click",()=>document.getElementById("restoreInput").click());
   document.getElementById("restoreInput").addEventListener("change",e=>{ if(e.target.files[0]) doRestore(e.target.files[0]); e.target.value=""; });
 
+  /* Supabase connection */
   document.getElementById("btnConn").addEventListener("click",()=>{ const c=getSupa()||{}; document.getElementById("supaUrl").value=c.url||""; document.getElementById("supaKey").value=c.key||""; showModal("supaModal"); });
   document.getElementById("supaClose").addEventListener("click",()=>hideModal("supaModal"));
   document.getElementById("supaModal").addEventListener("click",e=>{ if(e.target.id==="supaModal") hideModal("supaModal"); });
@@ -604,18 +1366,25 @@
     if(!url||!key){ toast("URLとキーを入力してください"); return; }
     setSupa({url,key}); hideModal("supaModal"); setSyncState("loading");
     try{
-      const peek=await fetch(supaBase()+"/rest/v1/payment_records?select=id&limit=1",{headers:supaH()});
+      const peek=await fetch(supaBase()+"/rest/v1/cargo_records?select=id&limit=1",{headers:supaH()});
       if(!peek.ok) throw new Error("接続"+peek.status);
       const peekRows=await peek.json();
-      if(peekRows.length===0 && payments.length) await supaPushAll();
+      if(peekRows.length===0 && (shipments.length||invoices.length)) await supaPushAll(); // サーバが空ならこの端末のデータで初期化
       await supaPull(); renderAll();
       toast("接続しました。複数PCで同期されます");
     }catch(e){ setSyncState("err",e.message); toast("接続に失敗: "+e.message); }
   });
   document.getElementById("btnSync").addEventListener("click",()=>{ if(!supaOn()){ toast("未接続です。『接続』から設定してください"); return; } supaPull().then(ok=>{ if(ok){ renderAll(); toast("最新を取得しました"); } }).catch(e=>toast("取得に失敗: "+e.message)); });
 
-  window.addEventListener("keydown",e=>{ if(e.key==="Escape"){ hideModal("supaModal"); } });
-  window.addEventListener("resize",()=>setMobile(!!selId));
+  /* report view controls */
+  document.getElementById("view-report").addEventListener("change",e=>{
+    if(e.target.id==="repMode") reportMode=e.target.value;
+    else if(e.target.id==="repYear") reportYear=e.target.value;
+    else if(e.target.id==="repSup") reportSupplier=e.target.value;
+    else return;
+    renderReport(); renderChips();
+  });
+  document.getElementById("view-report").addEventListener("click",e=>{ if(e.target.id==="repCsv") reportCsv(); });
 
   /* boot */
   if(!store.write(db)) document.getElementById("storageWarn").style.display="block";
