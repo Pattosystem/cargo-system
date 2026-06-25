@@ -3,774 +3,1023 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>仕入価格比較 — 仕入先別の価格とAI差分チェック</title>
+<title>製剤カタログ管理 | LIAS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Shippori+Mincho:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-  :root{
-    --ink:#1b1d2e; --ink-soft:#5d6076; --ink-faint:#9094a8;
-    --paper:#ffffff; --desk:#eceef5; --line:#dde0ec; --line-soft:#eef0f6;
-    --brand:#2b2750; --brand-deep:#211d40; --accent:#5b51c4;
-    --best:#157a54; --best-bg:#e7f4ee;
-    --up:#c0392b; --up-bg:#fcebe9;
-    --down:#2456b0; --down-bg:#e9eefb;
-    --same:#5d6076; --same-bg:#eef0f6;
-    --new:#b07514; --new-bg:#fbf2e2;
-    --shadow:0 1px 2px rgba(27,29,46,.06), 0 8px 24px rgba(27,29,46,.07);
-    --radius:10px;
+:root{
+  --paper:#FAF8F4;
+  --surface:#FFFFFF;
+  --surface-2:#F4F1EB;
+  --ink:#1E2329;
+  --ink-soft:#5A6470;
+  --ink-faint:#94A0AB;
+  --line:#E8E2D8;
+  --line-soft:#F0ECE3;
+  --accent:#2F7A6F;
+  --accent-deep:#235A52;
+  --accent-soft:#E4EFEC;
+  --amber:#B07A12;
+  --amber-soft:#F6ECD6;
+  --rose:#B0473F;
+  --rose-soft:#F6E1DE;
+  --gray-chip:#7A828C;
+  --gray-soft:#EDEEF0;
+  --shadow:0 1px 2px rgba(30,35,41,.04),0 8px 24px rgba(30,35,41,.06);
+  --shadow-lg:0 12px 48px rgba(30,35,41,.18);
+  --radius:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:"Noto Sans JP",-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN",sans-serif;
+  background:var(--paper);
+  color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+  line-height:1.6;
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+input,select,textarea{font-family:inherit;font-size:14px}
+::selection{background:var(--accent-soft)}
+
+/* ---------- Top bar ---------- */
+.topbar{
+  position:sticky;top:0;z-index:40;
+  background:rgba(250,248,244,.86);
+  backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line);
+  padding:14px 24px;
+  display:flex;align-items:center;gap:20px;
+}
+.brand{display:flex;align-items:baseline;gap:10px;flex-shrink:0}
+.brand .mark{
+  font-family:"Shippori Mincho",serif;font-weight:700;font-size:21px;
+  letter-spacing:.04em;color:var(--accent-deep);
+}
+.brand .sub{
+  font-size:11px;color:var(--ink-faint);letter-spacing:.18em;
+  text-transform:uppercase;font-weight:500;
+}
+.search-wrap{position:relative;flex:1;max-width:460px}
+.search-wrap svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--ink-faint)}
+#search{
+  width:100%;padding:9px 14px 9px 38px;border:1px solid var(--line);
+  border-radius:10px;background:var(--surface);color:var(--ink);
+  transition:border-color .15s, box-shadow .15s;
+}
+#search:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.topbar-spacer{flex:1}
+.icon-btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:38px;height:38px;border-radius:10px;color:var(--ink-soft);
+  border:1px solid var(--line);background:var(--surface);transition:.15s;
+}
+.icon-btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn-primary{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:9px 17px;border-radius:10px;background:var(--accent);color:#fff;
+  font-weight:500;font-size:14px;transition:.15s;white-space:nowrap;
+}
+.btn-primary:hover{background:var(--accent-deep)}
+.btn-ghost{
+  display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:9px;
+  border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);font-size:13px;transition:.15s;
+}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ---------- Layout ---------- */
+.layout{display:flex;align-items:flex-start;max-width:1500px;margin:0 auto}
+.sidebar{
+  width:236px;flex-shrink:0;padding:26px 18px 60px 24px;
+  position:sticky;top:69px;align-self:flex-start;
+  max-height:calc(100vh - 69px);overflow-y:auto;
+}
+.main{flex:1;min-width:0;padding:26px 24px 80px}
+
+.facet{margin-bottom:26px}
+.facet-title{
+  font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-faint);font-weight:700;margin:0 0 10px 4px;
+}
+.facet-item{
+  display:flex;align-items:center;justify-content:space-between;
+  width:100%;padding:7px 10px;border-radius:8px;color:var(--ink-soft);
+  font-size:13.5px;text-align:left;transition:.12s;margin-bottom:1px;
+}
+.facet-item:hover{background:var(--surface-2)}
+.facet-item.active{background:var(--accent-soft);color:var(--accent-deep);font-weight:500}
+.facet-item .count{font-size:11.5px;color:var(--ink-faint);font-variant-numeric:tabular-nums}
+.facet-item.active .count{color:var(--accent)}
+
+/* ---------- Stats strip ---------- */
+.stats{display:flex;gap:14px;margin-bottom:24px;flex-wrap:wrap}
+.stat{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  padding:15px 20px;min-width:120px;flex:1;box-shadow:var(--shadow);
+}
+.stat .num{font-size:27px;font-weight:700;letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1.1}
+.stat .lbl{font-size:11.5px;color:var(--ink-faint);margin-top:3px;letter-spacing:.04em}
+.stat.warn .num{color:var(--rose)}
+
+/* ---------- Toolbar ---------- */
+.toolbar{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.toolbar .result-count{font-size:13px;color:var(--ink-soft)}
+.toolbar .result-count b{color:var(--ink);font-weight:700}
+.toolbar-spacer{flex:1}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--surface)}
+.seg button{padding:7px 11px;color:var(--ink-faint);display:inline-flex;align-items:center}
+.seg button.active{background:var(--accent-soft);color:var(--accent-deep)}
+#sort{padding:7px 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink-soft)}
+#sort:focus{outline:none;border-color:var(--accent)}
+
+/* ---------- Active filter pills ---------- */
+.active-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.fpill{
+  display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;
+  background:var(--accent-soft);color:var(--accent-deep);font-size:12.5px;
+}
+.fpill button{color:var(--accent);font-size:15px;line-height:1;display:flex}
+
+/* ---------- Product grid ---------- */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:16px}
+.card{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px;cursor:pointer;transition:.16s;box-shadow:var(--shadow);
+  display:flex;flex-direction:column;position:relative;overflow:hidden;
+}
+.card:hover{transform:translateY(-2px);border-color:var(--accent);box-shadow:var(--shadow-lg)}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--cat-color,var(--line))}
+.card .cat-eyebrow{
+  font-size:10.5px;letter-spacing:.1em;font-weight:700;color:var(--cat-color,var(--ink-faint));
+  text-transform:uppercase;margin-bottom:7px;
+}
+.card .name{font-size:16px;font-weight:700;letter-spacing:-.01em;line-height:1.35}
+.card .name-en{font-size:12px;color:var(--ink-faint);margin-top:1px}
+.card .maker{font-size:12.5px;color:var(--ink-soft);margin-top:9px;display:flex;align-items:center;gap:5px}
+.card .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:13px}
+.card .footer{
+  margin-top:14px;padding-top:12px;border-top:1px solid var(--line-soft);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.doc-count{font-size:12px;color:var(--ink-soft);display:inline-flex;align-items:center;gap:5px}
+.doc-count.zero{color:var(--rose)}
+
+.chip{font-size:11px;padding:3px 9px;border-radius:6px;font-weight:500;white-space:nowrap}
+.chip.green{background:var(--accent-soft);color:var(--accent-deep)}
+.chip.amber{background:var(--amber-soft);color:var(--amber)}
+.chip.gray{background:var(--gray-soft);color:var(--gray-chip)}
+.chip.rose{background:var(--rose-soft);color:var(--rose)}
+.chip.tag{background:var(--surface-2);color:var(--ink-soft)}
+
+/* ---------- Table view ---------- */
+.tbl{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
+.tbl th{
+  text-align:left;font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink-faint);font-weight:700;padding:13px 16px;border-bottom:1px solid var(--line);background:var(--surface-2);
+}
+.tbl td{padding:13px 16px;border-bottom:1px solid var(--line-soft);font-size:13.5px;vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tbody tr{cursor:pointer;transition:background .12s}
+.tbl tbody tr:hover{background:var(--surface-2)}
+.tbl .t-name{font-weight:700}
+.tbl .t-en{font-size:11.5px;color:var(--ink-faint)}
+
+/* ---------- Empty ---------- */
+.empty{text-align:center;padding:70px 20px;color:var(--ink-faint)}
+.empty h3{font-family:"Shippori Mincho",serif;color:var(--ink-soft);font-weight:600;margin:0 0 6px}
+
+/* ---------- Drawer ---------- */
+.scrim{position:fixed;inset:0;background:rgba(30,35,41,.32);backdrop-filter:blur(2px);z-index:50;opacity:0;pointer-events:none;transition:opacity .22s}
+.scrim.show{opacity:1;pointer-events:auto}
+.drawer{
+  position:fixed;top:0;right:0;height:100%;width:min(520px,100%);
+  background:var(--paper);z-index:60;box-shadow:var(--shadow-lg);
+  transform:translateX(100%);transition:transform .26s cubic-bezier(.4,0,.2,1);
+  display:flex;flex-direction:column;
+}
+.drawer.show{transform:translateX(0)}
+.drawer-head{
+  padding:22px 26px 18px;border-bottom:1px solid var(--line);
+  position:relative;flex-shrink:0;
+}
+.drawer-head .cat-eyebrow{font-size:11px;letter-spacing:.12em;font-weight:700;text-transform:uppercase;margin-bottom:8px}
+.drawer-head h2{font-size:23px;font-weight:700;letter-spacing:-.01em;margin:0;line-height:1.3}
+.drawer-head .name-en{font-size:13px;color:var(--ink-faint);margin-top:3px}
+.drawer-head .chips{margin-top:14px;display:flex;gap:7px;flex-wrap:wrap}
+.drawer-close{position:absolute;top:18px;right:20px}
+.drawer-body{flex:1;overflow-y:auto;padding:22px 26px 40px}
+.meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px;margin-bottom:24px}
+.meta-grid .full{grid-column:1/-1}
+.meta-item .k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);font-weight:700;margin-bottom:3px}
+.meta-item .v{font-size:14px;color:var(--ink)}
+.note-box{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:13px 15px;font-size:13.5px;color:var(--ink-soft);white-space:pre-wrap;line-height:1.7}
+
+.section-label{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);font-weight:700;margin:26px 0 12px;display:flex;align-items:center;gap:10px}
+.section-label::after{content:"";flex:1;height:1px;background:var(--line)}
+
+.doc-group{margin-bottom:18px}
+.doc-group-title{font-size:12.5px;font-weight:700;color:var(--accent-deep);margin-bottom:8px;display:flex;align-items:center;gap:7px}
+.doc{
+  display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--surface);
+  border:1px solid var(--line);border-radius:10px;margin-bottom:7px;transition:.14s;
+}
+.doc:hover{border-color:var(--accent)}
+.doc .dico{width:34px;height:34px;border-radius:8px;background:var(--accent-soft);color:var(--accent-deep);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.doc .dname{flex:1;min-width:0;font-size:13.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.doc .dname small{display:block;font-weight:400;color:var(--ink-faint);font-size:11px}
+.doc a.open{font-size:12px;color:var(--accent);padding:5px 11px;border:1px solid var(--accent-soft);border-radius:7px;text-decoration:none;flex-shrink:0}
+.doc a.open:hover{background:var(--accent-soft)}
+.doc .del-doc{color:var(--ink-faint);flex-shrink:0;padding:4px}
+.doc .del-doc:hover{color:var(--rose)}
+.no-docs{font-size:13px;color:var(--ink-faint);padding:14px;border:1px dashed var(--line);border-radius:10px;text-align:center}
+
+.drawer-foot{padding:16px 26px;border-top:1px solid var(--line);display:flex;gap:10px;flex-shrink:0;background:var(--paper)}
+.drawer-foot .btn-ghost.danger{margin-left:auto;color:var(--rose);border-color:var(--rose-soft)}
+.drawer-foot .btn-ghost.danger:hover{background:var(--rose-soft)}
+
+/* ---------- Modal ---------- */
+.modal-scrim{position:fixed;inset:0;background:rgba(30,35,41,.4);backdrop-filter:blur(3px);z-index:70;display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto}
+.modal-scrim.show{display:flex}
+.modal{background:var(--paper);border-radius:18px;width:min(620px,100%);box-shadow:var(--shadow-lg);overflow:hidden}
+.modal-head{padding:22px 26px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+.modal-head h2{font-family:"Shippori Mincho",serif;font-size:19px;font-weight:600;margin:0}
+.modal-body{padding:24px 26px;max-height:64vh;overflow-y:auto}
+.modal-foot{padding:16px 26px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px}
+
+.field{margin-bottom:16px}
+.field.row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:0}
+.field label{display:block;font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:5px;letter-spacing:.02em}
+.field input,.field select,.field textarea{
+  width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:9px;
+  background:var(--surface);color:var(--ink);transition:.15s;
+}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.field textarea{resize:vertical;min-height:70px}
+.field .hint{font-size:11.5px;color:var(--ink-faint);margin-top:4px}
+
+.doc-editor{border:1px solid var(--line);border-radius:11px;padding:14px;background:var(--surface-2)}
+.doc-row{display:grid;grid-template-columns:120px 1fr auto;gap:8px;align-items:center;margin-bottom:8px}
+.doc-row input,.doc-row select{padding:7px 10px;font-size:13px}
+.doc-row .rm{color:var(--ink-faint);padding:6px}
+.doc-row .rm:hover{color:var(--rose)}
+.add-doc-row{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;align-items:center}
+.add-doc-row .or{font-size:11px;color:var(--ink-faint)}
+.file-label{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--accent);border:1px dashed var(--accent);padding:7px 12px;border-radius:8px;cursor:pointer}
+.file-label.disabled{color:var(--ink-faint);border-color:var(--line);cursor:not-allowed}
+
+.banner{padding:10px 14px;border-radius:9px;font-size:12.5px;margin-bottom:16px}
+.banner.info{background:var(--accent-soft);color:var(--accent-deep)}
+.banner.warn{background:var(--amber-soft);color:var(--amber)}
+
+.mode-badge{font-size:11px;padding:4px 10px;border-radius:20px;font-weight:500;white-space:nowrap}
+.mode-badge.local{background:var(--amber-soft);color:var(--amber)}
+.mode-badge.cloud{background:var(--accent-soft);color:var(--accent-deep)}
+
+.code{background:var(--ink);color:#D8E0DC;border-radius:10px;padding:14px;font-family:ui-monospace,SFMono-Regular,monospace;font-size:11.5px;line-height:1.6;overflow-x:auto;white-space:pre}
+
+.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 22px;border-radius:11px;font-size:13.5px;z-index:90;opacity:0;transition:.25s;box-shadow:var(--shadow-lg)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.menu-toggle{display:none}
+
+/* ---------- Responsive ---------- */
+@media(max-width:880px){
+  .topbar{padding:12px 16px;gap:12px;flex-wrap:wrap}
+  .brand .sub{display:none}
+  .search-wrap{order:3;flex-basis:100%;max-width:none}
+  .menu-toggle{display:inline-flex}
+  .sidebar{
+    position:fixed;top:0;left:0;height:100%;z-index:55;width:280px;background:var(--paper);
+    max-height:100%;transform:translateX(-100%);transition:transform .24s;box-shadow:var(--shadow-lg);
+    padding-top:24px;
   }
-  *{box-sizing:border-box;}
-  html,body{margin:0;height:100%;}
-  body{font-family:"Inter","Noto Sans JP",system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--desk);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
-  .mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;}
-  button{font-family:inherit;cursor:pointer;}
-  input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
-  input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
-
-  .appbar{background:var(--brand-deep);color:#fff;padding:12px 22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;border-bottom:3px solid var(--accent);}
-  .brand{display:flex;align-items:baseline;gap:11px;}
-  .brand h1{font-family:"Archivo",sans-serif;font-weight:800;font-size:18px;letter-spacing:.05em;margin:0;text-transform:uppercase;}
-  .brand .jp{font-size:12px;color:#b3b0d8;font-weight:500;letter-spacing:.03em;}
-  .xlink{color:#b3b0d8;text-decoration:none;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,.18);border-radius:7px;padding:6px 11px;}
-  .xlink:hover{background:rgba(255,255,255,.1);color:#fff;}
-  .tabs{display:flex;gap:6px;background:rgba(255,255,255,.07);padding:4px;border-radius:10px;}
-  .tab{background:transparent;border:none;color:#b3b0d8;padding:7px 15px;border-radius:7px;font-weight:600;font-size:13px;}
-  .tab.active{background:#fff;color:var(--brand);}
-  .right{margin-left:auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
-  .data-tools{display:flex;align-items:center;gap:8px;}
-  .dt-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);color:#fff;border-radius:7px;padding:6px 11px;font-size:12px;font-weight:600;}
-  .dt-btn:hover{background:rgba(255,255,255,.2);}
-  .state{font-size:11px;color:#b3b0d8;font-family:"JetBrains Mono",monospace;white-space:nowrap;}
-  .state.warn{color:#ffc78a;}
-  .storage-warn{background:#fbf2e2;color:#8a5a10;font-size:12px;padding:7px 16px;text-align:center;border-bottom:1px solid #ecd9b0;}
-
-  .wrap{height:calc(100% - 64px);overflow:auto;}
-  /* ---- compare view ---- */
-  .layout{display:grid;grid-template-columns:330px 1fr;height:calc(100% - 64px);}
-  @media(max-width:860px){.layout{grid-template-columns:1fr;} .plist[data-mh="1"]{display:none;} .pdetail[data-mh="1"]{display:none;}}
-  .plist{background:var(--paper);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;}
-  .plist-head{padding:13px 15px;border-bottom:1px solid var(--line);}
-  .btn-new{width:100%;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px;font-weight:600;font-size:14px;}
-  .btn-new:hover{background:var(--brand);}
-  .search{margin-top:9px;width:100%;padding:8px 11px;border:1px solid var(--line);border-radius:8px;background:var(--line-soft);}
-  .pcards{overflow-y:auto;flex:1;min-height:0;padding:8px;}
-  .pcard{border:1px solid var(--line);border-radius:9px;padding:11px 12px;margin-bottom:8px;cursor:pointer;background:#fff;border-left-width:4px;border-left-color:var(--line);}
-  .pcard:hover{border-color:var(--accent);}
-  .pcard.sel{border-color:var(--accent);border-left-color:var(--accent);box-shadow:var(--shadow);}
-  .pcard-name{font-weight:700;font-size:14px;}
-  .pcard-sub{color:var(--ink-soft);font-size:12px;margin-top:3px;}
-  .pcard-best{margin-top:6px;font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--best);font-weight:700;}
-  .empty-list{padding:30px 18px;text-align:center;color:var(--ink-faint);font-size:13px;}
-
-  .pdetail{overflow-y:auto;min-height:0;padding:22px;}
-  .detail-empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--ink-faint);text-align:center;gap:8px;}
-  .detail-empty .big{font-family:"Archivo",sans-serif;font-weight:700;font-size:22px;color:var(--ink-soft);}
-  .sheet{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);max-width:1000px;margin:0 auto;overflow:hidden;}
-  .sheet-head{background:var(--brand-deep);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;}
-  .sheet-head .stamp{font-family:"Archivo",sans-serif;font-size:11px;letter-spacing:.16em;color:#b3b0d8;text-transform:uppercase;}
-  .sheet-head h2{font-size:20px;margin:3px 0 0;}
-  .sheet-head .aka{font-size:12px;color:#b3b0d8;margin-top:4px;}
-  .icon-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);color:#fff;border-radius:7px;padding:6px 11px;font-size:12px;font-weight:600;}
-  .icon-btn:hover{background:rgba(255,255,255,.2);}
-  .icon-btn.danger:hover{background:#c0392b;border-color:#c0392b;}
-  .cmp-tools{padding:14px 20px;border-bottom:1px solid var(--line-soft);display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-  .btn-ghost{background:#fff;border:1px solid var(--line);border-radius:7px;padding:7px 12px;font-size:12.5px;font-weight:600;color:var(--accent);}
-  .btn-ghost:hover{background:var(--line-soft);}
-  .note{font-size:12px;color:var(--ink-faint);}
-
-  .ctable{width:100%;border-collapse:collapse;}
-  .ctable th,.ctable td{padding:11px 14px;border-bottom:1px solid var(--line-soft);font-size:13px;text-align:left;}
-  .ctable th{font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;background:var(--line-soft);}
-  .ctable td.num,.ctable th.num{text-align:right;font-family:"JetBrains Mono",monospace;}
-  .ctable tr.best td{background:var(--best-bg);}
-  .sup-name{font-weight:600;}
-  .medal{color:var(--best);font-weight:800;font-size:12px;margin-left:6px;}
-  .approx{color:var(--ink-soft);}
-  .src{font-size:11px;color:var(--ink-faint);}
-  .cmp-empty{padding:34px 18px;text-align:center;color:var(--ink-faint);}
-
-  /* ---- check view ---- */
-  .pad{padding:22px;max-width:1040px;margin:0 auto;}
-  .card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);}
-  .card-h{padding:16px 20px;border-bottom:1px solid var(--line-soft);}
-  .card-h h2{font-family:"Archivo",sans-serif;font-size:16px;letter-spacing:.03em;margin:0;text-transform:uppercase;}
-  .card-h p{margin:6px 0 0;color:var(--ink-soft);font-size:13px;}
-  .card-b{padding:18px 20px;}
-  .drop{border:2px dashed var(--line);border-radius:12px;padding:30px;text-align:center;color:var(--ink-soft);}
-  .drop b{color:var(--ink);}
-  .drop .btn-primary{margin-top:12px;}
-  .btn-primary{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 20px;font-weight:600;}
-  .btn-primary:hover{background:var(--brand);}
-  .ex-spinner{display:flex;align-items:center;gap:11px;color:var(--ink-soft);padding:18px 0;font-size:14px;}
-  .spin{width:18px;height:18px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;}
-  @keyframes spin{to{transform:rotate(360deg);}}
-
-  .rev-top{display:grid;grid-template-columns:1fr 1fr 160px 130px;gap:12px;margin-bottom:16px;}
-  @media(max-width:760px){.rev-top{grid-template-columns:1fr 1fr;}}
-  .rfield{display:flex;flex-direction:column;gap:4px;}
-  .rfield label{font-size:11px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;}
-  .rfield input,.rfield select{border:1px solid var(--line);border-radius:7px;padding:8px 10px;background:#fff;width:100%;}
-  .rtable{width:100%;border-collapse:collapse;}
-  .rtable th,.rtable td{padding:9px 10px;border-bottom:1px solid var(--line-soft);font-size:13px;vertical-align:middle;}
-  .rtable th{font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;background:var(--line-soft);text-align:left;}
-  .rtable td.num{text-align:right;font-family:"JetBrains Mono",monospace;}
-  .rtable input,.rtable select{border:1px solid var(--line);border-radius:6px;padding:6px 8px;width:100%;}
-  .rtable input.num{text-align:right;font-family:"JetBrains Mono",monospace;}
-  .stat{font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;}
-  .stat.up{background:var(--up-bg);color:var(--up);}
-  .stat.down{background:var(--down-bg);color:var(--down);}
-  .stat.same{background:var(--same-bg);color:var(--same);}
-  .stat.new{background:var(--new-bg);color:var(--new);}
-  .stat.cur{background:var(--new-bg);color:var(--new);}
-  .stat.skip{background:#f0f0f3;color:#9094a8;}
-  .prev{font-size:11px;color:var(--ink-faint);font-family:"JetBrains Mono",monospace;}
-  .rev-foot{display:flex;justify-content:flex-end;gap:10px;margin-top:16px;align-items:center;}
-  .ex-warn{background:var(--up-bg);color:var(--up);border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:12px;}
-  .ex-note{background:var(--new-bg);color:var(--new);border-radius:8px;padding:9px 12px;font-size:12.5px;margin-bottom:12px;font-weight:500;}
-
-  /* ---- master view ---- */
-  .ms{display:flex;flex-direction:column;gap:18px;}
-  .mrow{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:9px;padding:10px 12px;background:#fff;}
-  .mrow input{border:1px solid var(--line);border-radius:7px;padding:7px 9px;}
-  .mrow .grow{flex:1;}
-  .mrow .row-del{background:none;border:none;color:var(--ink-faint);font-size:17px;padding:4px 8px;border-radius:6px;}
-  .mrow .row-del:hover{color:var(--up);background:var(--up-bg);}
-  .madd{background:#fff;border:1px dashed var(--line);border-radius:9px;padding:9px;width:100%;color:var(--accent);font-weight:600;font-size:13px;}
-  .madd:hover{border-color:var(--accent);background:var(--line-soft);}
-  .m-cap{font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:7px;}
-  .m-hint{font-size:12px;color:var(--ink-faint);margin:0 0 10px;}
-
-  .modal-bg{position:fixed;inset:0;background:rgba(33,29,64,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:50;}
-  .modal-bg.open{display:flex;}
-  .modal{background:#fff;border-radius:12px;max-width:620px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);max-height:86vh;display:flex;flex-direction:column;}
-  .modal-head{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;}
-  .modal-head h3{margin:0;font-family:"Archivo",sans-serif;font-size:16px;letter-spacing:.03em;}
-  .modal-body{padding:18px 20px;overflow:auto;}
-  .modal-body p{margin:0 0 10px;color:var(--ink-soft);font-size:13px;}
-  .modal-body input,.modal-body textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 11px;}
-  .modal-foot{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px;}
-  .modal-field{display:flex;flex-direction:column;gap:5px;margin-bottom:10px;}
-  .modal-field label{font-size:11px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;}
-  .htable{width:100%;border-collapse:collapse;}
-  .htable th,.htable td{padding:8px 10px;border-bottom:1px solid var(--line-soft);font-size:13px;text-align:left;}
-  .htable td.num{text-align:right;font-family:"JetBrains Mono",monospace;}
-  .htable th{font-size:11px;color:var(--ink-soft);text-transform:uppercase;background:var(--line-soft);}
-
-  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 20px;border-radius:9px;font-size:13px;font-weight:500;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60;box-shadow:var(--shadow);}
-  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
-  .toast-undo{background:#fff;color:var(--ink);border:none;border-radius:6px;padding:4px 11px;font-weight:700;font-size:12px;margin-left:12px;cursor:pointer;}
-  @media(prefers-reduced-motion:reduce){*{transition:none!important;}}
+  .sidebar.open{transform:translateX(0)}
+  .main{padding:18px 16px 80px}
+  .meta-grid{grid-template-columns:1fr}
+  .field.row{grid-template-columns:1fr}
+  .doc-row{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){
+  *{transition:none!important;animation:none!important}
+}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </style>
 </head>
 <body>
 
-<div class="appbar">
-  <div class="brand"><h1>Price&nbsp;Compare</h1><span class="jp">仕入価格比較</span></div>
-  <a class="xlink" href="../">← 貨物照合へ</a>
-  <div class="tabs">
-    <button class="tab active" data-tab="compare">比較</button>
-    <button class="tab" data-tab="check">価格チェック</button>
-    <button class="tab" data-tab="master">マスタ</button>
+<header class="topbar">
+  <button class="icon-btn menu-toggle" id="menuToggle" aria-label="メニュー">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+  <div class="brand">
+    <span class="mark">LIAS</span>
+    <span class="sub">Product Catalog</span>
   </div>
-  <div class="right">
-    <div class="data-tools">
-      <button class="dt-btn" id="btnAI" title="AI読み取りの設定（APIキー）">AI設定</button>
-      <button class="dt-btn" id="btnConn" title="チーム同期(Supabase)の接続設定">接続</button>
-      <button class="dt-btn" id="btnBackup">バックアップ</button>
-      <button class="dt-btn" id="btnRestore">復元</button>
-      <span class="state" id="syncState"></span>
-      <span class="state" id="backupState"></span>
-    </div>
-    <input type="file" id="restoreInput" accept="application/json,.json" style="display:none">
+  <div class="search-wrap">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input id="search" type="search" placeholder="商品名・メーカー・タグで検索">
   </div>
-</div>
+  <div class="topbar-spacer"></div>
+  <span class="mode-badge" id="modeBadge">—</span>
+  <button class="icon-btn" id="csvBtn" title="CSV取込・書出">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>
+  </button>
+  <button class="icon-btn" id="settingsBtn" title="接続設定">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
+  <button class="btn-primary" id="addBtn">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    製剤を追加
+  </button>
+</header>
 
-<div id="storageWarn" class="storage-warn" style="display:none;">プレビュー環境のため保存できません。GitHub Pages へ配置するか、ファイルを保存してブラウザで開くと自動保存されます。</div>
-
-<!-- COMPARE -->
-<div class="layout" id="view-compare">
-  <aside class="plist" id="plistPane">
-    <div class="plist-head">
-      <button class="btn-new" id="btnNewProd">＋ 商品を追加</button>
-      <input class="search" id="prodSearch" placeholder="商品名で検索">
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="facet">
+      <p class="facet-title">カテゴリー</p>
+      <div id="catFacets"></div>
     </div>
-    <div class="pcards" id="prodCards"></div>
+    <div class="facet">
+      <p class="facet-title">取扱ステータス</p>
+      <div id="statusFacets"></div>
+    </div>
+    <div class="facet">
+      <p class="facet-title">薬監証明</p>
+      <div id="yakkanFacets"></div>
+    </div>
   </aside>
-  <section class="pdetail" id="prodDetailPane">
-    <div class="detail-empty" id="prodEmpty">
-      <div class="big">商品を選択</div>
-      <div>左から商品を選ぶと、仕入先ごとの価格が円換算の安い順で並びます。</div>
+
+  <main class="main">
+    <div class="stats" id="stats"></div>
+
+    <div class="active-filters" id="activeFilters"></div>
+
+    <div class="toolbar">
+      <span class="result-count" id="resultCount"></span>
+      <div class="toolbar-spacer"></div>
+      <select id="sort">
+        <option value="name">名前順</option>
+        <option value="updated">更新が新しい順</option>
+        <option value="category">カテゴリー順</option>
+        <option value="docs">書類が少ない順</option>
+      </select>
+      <div class="seg">
+        <button id="viewGrid" class="active" title="カード表示">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        </button>
+        <button id="viewList" title="一覧表示">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        </button>
+      </div>
     </div>
-    <div id="prodDetail" style="display:none;"></div>
-  </section>
+
+    <div id="productArea"></div>
+  </main>
 </div>
 
-<!-- CHECK -->
-<div class="wrap" id="view-check" style="display:none;">
-  <div class="pad" id="checkArea"></div>
-</div>
+<!-- Drawer -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true"></aside>
 
-<!-- MASTER -->
-<div class="wrap" id="view-master" style="display:none;">
-  <div class="pad" id="masterArea"></div>
-</div>
-
-<!-- AI settings modal -->
-<div class="modal-bg" id="aiModal">
-  <div class="modal" style="max-width:560px;">
-    <div class="modal-head"><h3>AI読み取り設定</h3><button class="icon-btn" style="background:#eef0f6;border-color:#dde0ec;color:#5d6076;" id="aiClose">閉じる</button></div>
-    <div class="modal-body">
-      <p>インボイスをAIで読み取るには Anthropic APIキー が必要です。キーは<b>この端末のブラウザ内だけ</b>に保存され、バックアップには含まれません。貨物・支払いと同じ <b>sk-ant-</b> キーでOK（各アプリで別保存）。</p>
-      <input id="aiKeyInput" placeholder="sk-ant-..." style="font-family:'JetBrains Mono',monospace;">
-    </div>
-    <div class="modal-foot"><button class="btn-ghost" id="aiClear">キーを削除</button><button class="btn-primary" id="aiSave">保存</button></div>
-  </div>
-</div>
-
-<!-- Supabase modal -->
-<div class="modal-bg" id="supaModal">
-  <div class="modal" style="max-width:560px;">
-    <div class="modal-head"><h3>チーム同期 接続設定</h3><button class="icon-btn" style="background:#eef0f6;border-color:#dde0ec;color:#5d6076;" id="supaClose">閉じる</button></div>
-    <div class="modal-body">
-      <p>SupabaseのURLとanonキーを入れると、複数PCで同じデータを共有します。貨物・支払いと同じURL/キーでOK（テーブルは別なのでデータは独立）。値は<b>この端末のブラウザ内だけ</b>に保存され、バックアップには含まれません。</p>
-      <div class="modal-field"><label>Project URL</label><input id="supaUrl" placeholder="https://xxxx.supabase.co" style="font-family:'JetBrains Mono',monospace;"></div>
-      <div class="modal-field"><label>anon key</label><textarea id="supaKey" placeholder="eyJ... または sb_publishable_..." style="font-family:'JetBrains Mono',monospace;min-height:64px;resize:vertical;"></textarea></div>
-    </div>
-    <div class="modal-foot"><button class="btn-ghost" id="supaClear">接続を解除</button><button class="btn-primary" id="supaSave">保存して接続</button></div>
-  </div>
-</div>
-
-<!-- history / add-price modal -->
-<div class="modal-bg" id="histModal">
+<!-- Edit / Add modal -->
+<div class="modal-scrim" id="editScrim">
   <div class="modal">
-    <div class="modal-head"><h3 id="histTitle">価格履歴</h3><button class="icon-btn" style="background:#eef0f6;border-color:#dde0ec;color:#5d6076;" id="histClose">閉じる</button></div>
-    <div class="modal-body" id="histBody"></div>
-    <div class="modal-foot" id="histFoot"></div>
+    <div class="modal-head">
+      <h2 id="editTitle">製剤を追加</h2>
+      <button class="icon-btn" id="editClose" aria-label="閉じる">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label>商品名 *</label><input id="f_name" placeholder="例：リジュラン ヒーラー"></div>
+      <div class="field row">
+        <div><label>英名・表記</label><input id="f_name_en" placeholder="Rejuran Healer"></div>
+        <div><label>メーカー</label><input id="f_maker" placeholder="PharmaResearch"></div>
+      </div>
+      <div class="field row">
+        <div><label>カテゴリー</label><select id="f_category"></select></div>
+        <div><label>原産国</label><input id="f_origin" placeholder="韓国"></div>
+      </div>
+      <div class="field row">
+        <div><label>取扱ステータス</label>
+          <select id="f_status"><option>取扱中</option><option>検討中</option><option>取扱終了</option></select>
+        </div>
+        <div><label>薬監証明</label>
+          <select id="f_yakkan"><option>取得済</option><option>申請中</option><option>不要</option><option>未対応</option></select>
+        </div>
+      </div>
+      <div class="field"><label>タグ</label><input id="f_tags" placeholder="カンマ区切り：PN, スキンブースター, 院内人気"><div class="hint">カンマ（,）で複数指定できます</div></div>
+      <div class="field"><label>メモ</label><textarea id="f_note" placeholder="規格・入数・参考価格・注意点など"></textarea></div>
+
+      <div class="field">
+        <label>関連書類</label>
+        <div class="doc-editor">
+          <div id="docRows"></div>
+          <div class="add-doc-row">
+            <select id="newDocType" class="doc-type-select"></select>
+            <input id="newDocName" placeholder="書類名（例：2024カタログ）" style="flex:1;min-width:140px;padding:7px 10px;border:1px solid var(--line);border-radius:8px">
+            <input id="newDocUrl" placeholder="ファイルURL" style="flex:1;min-width:140px;padding:7px 10px;border:1px solid var(--line);border-radius:8px">
+            <span class="or">または</span>
+            <label class="file-label" id="uploadLabel">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              アップロード
+              <input type="file" id="newDocFile" hidden accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xlsx">
+            </label>
+            <button class="btn-ghost" id="addDocBtn" type="button">追加</button>
+          </div>
+          <div class="hint" id="uploadHint" style="margin-top:8px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" id="editCancel">キャンセル</button>
+      <button class="btn-primary" id="editSave">保存する</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings modal -->
+<div class="modal-scrim" id="setScrim">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>接続設定</h2>
+      <button class="icon-btn" id="setClose" aria-label="閉じる">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="banner info">Supabaseを設定すると、複数端末・スタッフ間でデータと書類を共有できます。未設定でもこの端末内（ブラウザ）でそのまま使えます。</div>
+      <div class="field"><label>Supabase URL</label><input id="s_url" placeholder="https://xxxxx.supabase.co"></div>
+      <div class="field"><label>Supabase anon key</label><input id="s_key" placeholder="eyJhbGci..."></div>
+      <div class="field"><label>Storageバケット名</label><input id="s_bucket" placeholder="catalogs" value="catalogs"></div>
+      <div style="display:flex;gap:10px;margin:8px 0 20px">
+        <button class="btn-primary" id="s_save">接続を保存</button>
+        <button class="btn-ghost" id="s_clear">接続を解除</button>
+      </div>
+      <p class="facet-title" style="margin-left:0">初期セットアップ（Supabase側で1回だけ実行）</p>
+      <div class="code" id="sqlCode"></div>
+      <div class="hint" style="margin-top:10px">① Supabaseで新規プロジェクト作成 → ② SQL Editorに上記を貼って実行 → ③ Storageで「catalogs」バケットを作成しPublicに設定 → ④ 上のURL / anon keyを入力して保存。</div>
+      <hr style="border:none;border-top:1px solid var(--line);margin:22px 0">
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn-ghost" id="exportJson">バックアップ書出(JSON)</button>
+        <label class="btn-ghost" style="cursor:pointer">復元(JSON)<input type="file" id="importJson" hidden accept=".json"></label>
+        <button class="btn-ghost danger" id="wipeBtn" style="color:var(--rose)">この端末のデータを全消去</button>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" id="setDone">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- CSV modal -->
+<div class="modal-scrim" id="csvScrim">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>CSV 取込 / 書出</h2>
+      <button class="icon-btn" id="csvClose" aria-label="閉じる">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="banner info">100製剤をまとめて登録するなら、テンプレートに入力 → 取込が一番早いです。</div>
+      <p class="facet-title" style="margin-left:0">① テンプレートを取得</p>
+      <button class="btn-ghost" id="csvTemplate" style="margin-bottom:8px">CSVテンプレートをダウンロード</button>
+      <div class="hint">列：商品名, 英名, カテゴリー, メーカー, 原産国, ステータス, 薬監証明, タグ, メモ, 書類（種別|名称|URL を「;」で複数可）</div>
+      <p class="facet-title" style="margin:22px 0 8px 0">② 取込</p>
+      <label class="file-label" style="display:inline-flex">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        CSVファイルを選択
+        <input type="file" id="csvFile" hidden accept=".csv">
+      </label>
+      <div class="hint" id="csvResult" style="margin-top:10px"></div>
+      <p class="facet-title" style="margin:22px 0 8px 0">③ 現在のデータを書出</p>
+      <button class="btn-ghost" id="csvExport">登録済みをCSVで書出</button>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" id="csvDone">閉じる</button>
+    </div>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
-<input type="file" id="invoiceInput" accept="application/pdf,image/*" style="display:none">
-
 <script>
-(function(){
-  "use strict";
-  const KEY="pricing-v1";
-  const store={
-    read(){ try{ const v=localStorage.getItem(KEY); return v?JSON.parse(v):null; }catch(e){ return null; } },
-    write(d){ try{ localStorage.setItem(KEY,JSON.stringify(d)); return true; }catch(e){ return false; } }
-  };
-  let db=store.read()||{};
-  db.products=db.products||[]; db.suppliers=db.suppliers||[]; db.prices=db.prices||[]; db.rates=db.rates||{};
-  const products=db.products, suppliers=db.suppliers, prices=db.prices;
-  let activeTab="compare", selProd=null, prodFilter="";
-  const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-  function esc(v){ return (v==null)?"":String(v).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
-  function save(){ if(!store.write(db)) document.getElementById("storageWarn").style.display="block"; scheduleSync(); }
-  function pad(n){ return String(n).padStart(2,"0"); }
-  function today(){ const d=new Date(); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
-  function fmtTime(ts){ if(!ts) return "—"; const d=new Date(ts); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
-  function fmtDate(ts){ const d=new Date(ts); return `${d.getMonth()+1}/${pad(d.getDate())}`; }
-  function num(v){ const n=Number(String(v==null?"":v).replace(/[^\d.-]/g,"")); return isNaN(n)?0:n; }
-  function fmtN(v,d){ const n=Number(v); if(isNaN(n)) return "—"; return n.toLocaleString(undefined,{maximumFractionDigits:d==null?2:d}); }
+"use strict";
+/* =========================================================
+   LIAS 製剤カタログ管理  —  single-file app
+   storage: Supabase (cloud) もしくは localStorage (this device)
+   ========================================================= */
 
-  /* ---- normalization & matching ---- */
-  function norm(s){ return String(s==null?"":s).trim().toLowerCase()
-    .replace(/[\uFF01-\uFF5E]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))
-    .replace(/[\s\-_.,;:・／/]/g,""); }
-  function matchProduct(name){ const n=norm(name); if(!n) return null;
-    return products.find(p=>norm(p.name)===n || (p.aliases||[]).some(a=>norm(a)===n)) || null; }
-  function matchSupplier(name){ const n=norm(name); if(!n) return null;
-    return suppliers.find(s=>norm(s.name)===n || (s.aliases||[]).some(a=>norm(a)===n)) || null; }
-  function supName(id){ const s=suppliers.find(x=>x.id===id); return s?s.name:"（不明な仕入先）"; }
-  function prodById(id){ return products.find(x=>x.id===id)||null; }
-  function rateOf(cur){ cur=(cur||"").toUpperCase(); if(cur==="JPY") return 1; const r=db.rates[cur]; return (r==null||r==="")?null:Number(r); }
-  function toJPY(price,cur){ const r=rateOf(cur); return r==null?null:price*r; }
-  function latestPrice(productId,supplierId){
-    const list=prices.filter(x=>x.productId===productId&&x.supplierId===supplierId).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.added||0)-(a.added||0));
-    return list[0]||null;
-  }
+const CATEGORIES = [
+  {key:"フィラー",       label:"注入剤（フィラー）", color:"#2F7A6F"},
+  {key:"トキシン",       label:"ボツリヌストキシン", color:"#7A5CB0"},
+  {key:"スキンブースター",label:"スキンブースター",   color:"#C06A8E"},
+  {key:"スレッド",       label:"スレッド（糸）",     color:"#B07A12"},
+  {key:"機器",           label:"医療機器・デバイス", color:"#3D6FB0"},
+  {key:"外用・ピーリング",label:"外用・ピーリング",   color:"#4F9B6B"},
+  {key:"その他",         label:"その他",             color:"#7A828C"},
+];
+const DOC_TYPES = ["カタログ","仕様書","薬監証明","添付文書","価格表","症例写真","認証・許可","その他"];
 
-  /* ---- IndexedDB (invoice files) ---- */
-  const IDB=(function(){
-    let dbp;
-    function open(){ if(dbp) return dbp; dbp=new Promise((res,rej)=>{ let r; try{ r=indexedDB.open("pricing-files",1); }catch(e){ return rej(e); }
-      r.onupgradeneeded=()=>{ if(!r.result.objectStoreNames.contains("files")) r.result.createObjectStore("files",{keyPath:"id"}); };
-      r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); return dbp; }
-    function tx(m){ return open().then(d=>d.transaction("files",m).objectStore("files")); }
-    return {
-      put:rec=>tx("readwrite").then(s=>new Promise((res,rej)=>{ const q=s.put(rec); q.onsuccess=()=>res(); q.onerror=()=>rej(q.error); })),
-      get:id=>tx("readonly").then(s=>new Promise((res,rej)=>{ const q=s.get(id); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); })),
-      all:()=>tx("readonly").then(s=>new Promise((res,rej)=>{ const q=s.getAll(); q.onsuccess=()=>res(q.result||[]); q.onerror=()=>rej(q.error); }))
-    };
-  })();
-  function blobToB64(b){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(",")[1]); r.onerror=()=>rej(r.error); r.readAsDataURL(b); }); }
-  function b64ToBlob(b64,t){ const bin=atob(b64); const a=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i); return new Blob([a],{type:t||"application/octet-stream"}); }
+const LS = {
+  products:"lias_pcm_products_v1",
+  config:"lias_pcm_config_v1",
+  view:"lias_pcm_view_v1"
+};
 
-  /* ---- Supabase sync ---- */
-  const SUPA_CFG="pricing-supa";
-  function getSupa(){ try{ return JSON.parse(localStorage.getItem(SUPA_CFG)||"null"); }catch(e){ return null; } }
-  function setSupa(c){ try{ if(c&&c.url&&c.key) localStorage.setItem(SUPA_CFG,JSON.stringify(c)); else localStorage.removeItem(SUPA_CFG); }catch(e){} }
-  function supaOn(){ const c=getSupa(); return !!(c&&c.url&&c.key); }
-  function supaBase(){ return getSupa().url.replace(/\/+$/,""); }
-  function supaH(extra){ const c=getSupa(); return Object.assign({apikey:c.key,Authorization:"Bearer "+c.key},extra||{}); }
-  let syncTimer=null,lastEditTs=0,syncBusy=false;
-  function setSyncState(state,msg){ const el=document.getElementById("syncState"); if(!el) return;
-    if(!supaOn()){ el.textContent="未接続(この端末のみ)"; el.className="state"; return; }
-    const map={ok:["同期OK",""],saving:["保存中…",""],loading:["取得中…",""],err:["同期エラー","warn"]};
-    const m=map[state]||map.ok; el.textContent="同期: "+m[0]+(msg?("／"+msg):""); el.className="state"+(m[1]?(" "+m[1]):""); }
-  function scheduleSync(){ lastEditTs=Date.now(); if(!supaOn()) return; setSyncState("saving"); clearTimeout(syncTimer);
-    syncTimer=setTimeout(()=>{ supaPush().then(()=>setSyncState("ok")).catch(e=>setSyncState("err",e.message)); },900); }
-  async function supaPush(){ if(!supaOn()) return; const now=new Date().toISOString();
-    const row={id:"main",data:{products,suppliers,prices,rates:db.rates},updated_at:now};
-    const r=await fetch(supaBase()+"/rest/v1/pricing_records",{method:"POST",headers:supaH({"Content-Type":"application/json",Prefer:"resolution=merge-duplicates"}),body:JSON.stringify([row])});
-    if(!r.ok) throw new Error("保存"+r.status); }
-  async function supaPull(){ if(!supaOn()) return false; setSyncState("loading");
-    const r=await fetch(supaBase()+"/rest/v1/pricing_records?id=eq.main&select=data",{headers:supaH()});
-    if(!r.ok){ setSyncState("err","取得"+r.status); return false; }
-    const rows=await r.json(); if(rows.length&&rows[0].data){ const d=rows[0].data;
-      db.products=d.products||[]; db.suppliers=d.suppliers||[]; db.prices=d.prices||[]; db.rates=d.rates||{};
-      products.length=0; db.products.forEach(x=>products.push(x));
-      suppliers.length=0; db.suppliers.forEach(x=>suppliers.push(x));
-      prices.length=0; db.prices.forEach(x=>prices.push(x));
-      store.write(db); }
-    setSyncState("ok"); return true; }
-  function supaFileUrl(id){ return supaBase()+"/storage/v1/object/public/cargo-files/price/"+encodeURIComponent(id); }
-  async function supaUpload(id,blob,type){ if(!supaOn()) return false;
-    try{ const r=await fetch(supaBase()+"/storage/v1/object/cargo-files/price/"+encodeURIComponent(id),{method:"POST",headers:supaH({"Content-Type":type||"application/octet-stream","x-upsert":"true"}),body:blob}); return r.ok; }catch(e){ return false; } }
-  async function getFileBlob(id){ try{ const rec=await IDB.get(id); if(rec&&rec.blob) return rec.blob; }catch(e){}
-    if(supaOn()){ try{ const r=await fetch(supaFileUrl(id)); if(r.ok) return await r.blob(); }catch(e){} } return null; }
-  function startAutoPull(){ setInterval(()=>{ if(!supaOn()||syncBusy) return;
-    const tag=(document.activeElement&&document.activeElement.tagName)||""; if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT") return;
-    if(Date.now()-lastEditTs<6000) return; if(document.querySelector(".modal-bg.open")) return;
-    syncBusy=true; supaPull().then(ok=>{ if(ok) renderAll(); }).catch(()=>{}).finally(()=>{ syncBusy=false; }); },20000); }
+let state = {
+  products:[],
+  filter:{cat:null,status:null,yakkan:null,q:""},
+  sort:"name",
+  view:"grid",
+  editing:null,          // product being edited (or {} for new)
+  draftDocs:[],          // docs in the edit modal
+  current:null           // product open in drawer
+};
+let sb=null, cfg={url:"",key:"",bucket:"catalogs"};
 
-  /* ---- AI key ---- */
-  const AIKEY="pricing-aikey";
-  function getKey(){ try{ return localStorage.getItem(AIKEY)||""; }catch(e){ return ""; } }
-  function setKey(k){ try{ if(k) localStorage.setItem(AIKEY,k); else localStorage.removeItem(AIKEY); }catch(e){} }
+/* ---------- helpers ---------- */
+const $=s=>document.querySelector(s);
+const $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>(s==null?"":String(s)).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const catOf=k=>CATEGORIES.find(c=>c.key===k)||CATEGORIES[CATEGORIES.length-1];
+function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),2200);}
 
-  /* ================= COMPARE VIEW ================= */
-  function bestJPY(productId){
-    let best=null;
-    suppliers.forEach(s=>{ const lp=latestPrice(productId,s.id); if(!lp) return; const j=toJPY(num(lp.unitPrice),lp.currency); if(j==null) return; if(best==null||j<best.j) best={j,sup:s.name,raw:lp}; });
-    return best;
-  }
-  function renderProdList(){
-    const wrap=document.getElementById("prodCards");
-    const f=prodFilter.trim().toLowerCase();
-    const rows=products.filter(p=>{ if(!f) return true; return ((p.name||"")+" "+((p.aliases||[]).join(" "))).toLowerCase().includes(f); })
-      .sort((a,b)=>(a.name||"").localeCompare(b.name||""));
-    if(!rows.length){ wrap.innerHTML='<div class="empty-list">'+(products.length?"該当なし":"商品がありません。<br>「＋商品を追加」か、価格チェックでインボイスを読み込むと増えます。")+'</div>'; return; }
-    wrap.innerHTML=rows.map(p=>{ const b=bestJPY(p.id); const supCount=suppliers.filter(s=>latestPrice(p.id,s.id)).length;
-      return `<div class="pcard ${p.id===selProd?'sel':''}" data-id="${p.id}">
-        <div class="pcard-name">${esc(p.name)}</div>
-        <div class="pcard-sub">${supCount?supCount+" 仕入先":"価格データなし"}${(p.aliases&&p.aliases.length)?(" ・別名"+p.aliases.length):""}</div>
-        ${b?`<div class="pcard-best">最安 ≈ ¥${fmtN(b.j,0)}　<span style="color:var(--ink-faint);font-weight:500;">(${esc(b.sup)})</span></div>`:''}
-      </div>`; }).join("");
-  }
-  function renderProdDetail(){
-    const empty=document.getElementById("prodEmpty"), c=document.getElementById("prodDetail");
-    const p=prodById(selProd);
-    if(!p){ empty.style.display="flex"; c.style.display="none"; setMobile(false); return; }
-    empty.style.display="none"; c.style.display="block"; setMobile(true);
-    const rows=[];
-    suppliers.forEach(s=>{ const lp=latestPrice(p.id,s.id); if(!lp) return; const j=toJPY(num(lp.unitPrice),lp.currency);
-      rows.push({sup:s,lp:lp,j:j}); });
-    rows.sort((a,b)=>{ if(a.j==null&&b.j==null) return 0; if(a.j==null) return 1; if(b.j==null) return -1; return a.j-b.j; });
-    const minJ=rows.reduce((m,r)=>r.j!=null&&(m==null||r.j<m)?r.j:m,null);
-    let body;
-    if(!rows.length){ body=`<div class="cmp-empty">この商品の価格データがまだありません。<br>下の「＋価格を追加」か、価格チェックでインボイスを読み込んでください。</div>`; }
-    else{ body=`<table class="ctable"><thead><tr><th>仕入先</th><th class="num">最新単価</th><th class="num">≈ 円換算</th><th>更新日</th><th>出典</th><th></th></tr></thead><tbody>`+
-      rows.map(r=>{ const best=(r.j!=null&&r.j===minJ);
-        return `<tr class="${best?'best':''}"><td><span class="sup-name">${esc(r.sup.name)}</span>${best?'<span class="medal">🏅最安</span>':''}</td>
-        <td class="num">${fmtN(num(r.lp.unitPrice))} ${esc(r.lp.currency||'')}</td>
-        <td class="num approx">${r.j!=null?('¥'+fmtN(r.j,0)):'<span class="src">レート未設定</span>'}</td>
-        <td>${esc(r.lp.date||'—')}</td>
-        <td class="src">${r.lp.source==='invoice'?'インボイス':'手入力'}</td>
-        <td class="num"><button class="btn-ghost" data-hist="${r.sup.id}">履歴</button></td></tr>`; }).join("")+`</tbody></table>`;
+/* ---------- storage layer ---------- */
+const store = {
+  async load(){
+    if(sb){
+      const {data,error}=await sb.from("products").select("*").order("updated_at",{ascending:false});
+      if(error){toast("クラウド読込エラー: "+error.message);return [];}
+      return (data||[]).map(normalize);
     }
-    c.innerHTML=`<div class="sheet">
-      <div class="sheet-head">
-        <div><div class="stamp">Product / 商品</div><h2>${esc(p.name)}</h2>${(p.aliases&&p.aliases.length)?`<div class="aka">別名: ${esc(p.aliases.join(" / "))}</div>`:''}</div>
-        <div style="display:flex;gap:8px;"><button class="icon-btn" id="btnEditProd">編集</button><button class="icon-btn danger" id="btnDelProd">削除</button></div>
-      </div>
-      <div class="cmp-tools">
-        <button class="btn-ghost" id="btnAddPrice">＋ 価格を追加</button>
-        <span class="note">円換算は「マスタ → 参考レート」の手入力レートによる概算です。素の通貨価格が正です。</span>
-      </div>
-      <div style="padding:4px 4px 8px;">${body}</div>
-    </div>`;
+    try{return JSON.parse(localStorage.getItem(LS.products)||"[]").map(normalize);}catch(e){return [];}
+  },
+  async save(p){
+    p.updated_at=new Date().toISOString();
+    if(!p.created_at)p.created_at=p.updated_at;
+    if(sb){
+      const row={id:p.id,name:p.name,name_en:p.name_en,category:p.category,maker:p.maker,
+        origin:p.origin,status:p.status,yakkan:p.yakkan,tags:p.tags,note:p.note,
+        documents:p.documents,created_at:p.created_at,updated_at:p.updated_at};
+      const {error}=await sb.from("products").upsert(row);
+      if(error){toast("保存エラー: "+error.message);return false;}
+    }else{
+      const i=state.products.findIndex(x=>x.id===p.id);
+      if(i>=0)state.products[i]=p;else state.products.push(p);
+      persistLocal();
+    }
+    return true;
+  },
+  async remove(id){
+    if(sb){const {error}=await sb.from("products").delete().eq("id",id);if(error){toast("削除エラー");return false;}}
+    else{state.products=state.products.filter(x=>x.id!==id);persistLocal();}
+    return true;
+  },
+  async upload(file){
+    if(!sb)return null;
+    const path=Date.now()+"_"+file.name.replace(/[^\w.\-]/g,"_");
+    const {error}=await sb.storage.from(cfg.bucket).upload(path,file,{upsert:false});
+    if(error){toast("アップロード失敗: "+error.message);return null;}
+    const {data}=sb.storage.from(cfg.bucket).getPublicUrl(path);
+    return data.publicUrl;
   }
-
-  /* ================= CHECK VIEW (invoice AI) ================= */
-  let checkState=null;
-  const INVOICE_PROMPT=`You are reading a commercial invoice (or price list / quotation) from a supplier of aesthetic-medicine products, to track per-supplier unit prices. Layouts and languages vary (English, Korean, Japanese). Read the line-item table semantically. Return ONLY a JSON object — no markdown, no code fences, no commentary.
-
-Schema:
-{
-  "supplier": string|null,
-  "invoiceDate": string|null,
-  "currency": string|null,
-  "items": [ { "name": string, "qty": number|null, "unitPrice": number } ],
-  "warnings": [ string ]
+};
+function persistLocal(){localStorage.setItem(LS.products,JSON.stringify(state.products));}
+function normalize(p){
+  return {id:p.id||uid(),name:p.name||"",name_en:p.name_en||"",category:p.category||"その他",
+    maker:p.maker||"",origin:p.origin||"",status:p.status||"取扱中",yakkan:p.yakkan||"未対応",
+    tags:Array.isArray(p.tags)?p.tags:(p.tags?String(p.tags).split(",").map(s=>s.trim()).filter(Boolean):[]),
+    note:p.note||"",documents:Array.isArray(p.documents)?p.documents:[],
+    created_at:p.created_at||null,updated_at:p.updated_at||null};
 }
 
-Rules:
-- supplier: the shipper / exporter / seller issuing the invoice (who we BUY from). Not the consignee/buyer.
-- invoiceDate: normalise to YYYY-MM-DD if present.
-- currency: 3-letter ISO code for the line-item prices; infer from symbols (₩=KRW, $=USD, ¥=JPY) if no code shown.
-- items: one entry per product row. "name" exactly as printed. "unitPrice" is the price PER UNIT (digits only, dot decimal, no separators or symbols). If only a line amount and qty are shown, unitPrice = amount / qty. "qty" is the quantity if shown.
-- Ignore non-product rows (subtotal, sum, total, shipping, tax, bank info).
-- warnings: anything ambiguous. Empty array if confident.`;
+/* ---------- config / supabase ---------- */
+function initSupabase(){
+  if(cfg.url&&cfg.key&&window.supabase){
+    try{sb=window.supabase.createClient(cfg.url,cfg.key);}catch(e){sb=null;}
+  }else sb=null;
+  const b=$("#modeBadge");
+  if(sb){b.textContent="クラウド同期";b.className="mode-badge cloud";}
+  else{b.textContent="この端末に保存";b.className="mode-badge local";}
+}
+function loadConfig(){try{const c=JSON.parse(localStorage.getItem(LS.config)||"{}");cfg={...cfg,...c};}catch(e){}}
 
-  async function extractInvoice(blob,mediaType){
-    const b64=await blobToB64(blob); const key=getKey();
-    const headers={"content-type":"application/json"};
-    if(key){ headers["x-api-key"]=key; headers["anthropic-version"]="2023-06-01"; headers["anthropic-dangerous-direct-browser-access"]="true"; }
-    const isPdf=/pdf/i.test(mediaType);
-    const source={type:"base64",media_type:isPdf?"application/pdf":(mediaType||"image/png"),data:b64};
-    const docBlock=isPdf?{type:"document",source}:{type:"image",source};
-    const body={model:"claude-sonnet-4-6",max_tokens:4096,messages:[{role:"user",content:[docBlock,{type:"text",text:INVOICE_PROMPT}]}]};
-    const resp=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers,body:JSON.stringify(body)});
-    if(!resp.ok){ let t=""; try{ t=await resp.text(); }catch(e){} throw new Error("API "+resp.status+(t?(" "+t.slice(0,140)):"")); }
-    const data=await resp.json();
-    const text=(data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n");
-    return parseJsonLoose(text);
-  }
-  function parseJsonLoose(text){ let t=String(text||"").replace(/```json|```/g,"").trim();
-    try{ return JSON.parse(t); }catch(e){} const a=t.indexOf("{"),b=t.lastIndexOf("}");
-    if(a>=0&&b>a){ try{ return JSON.parse(t.slice(a,b+1)); }catch(e){} }
-    throw new Error("読み取り結果を解析できませんでした"); }
-
-  function renderCheck(){
-    const el=document.getElementById("checkArea");
-    if(!checkState){
-      el.innerHTML=`<div class="card"><div class="card-h"><h2>インボイスで価格チェック</h2>
-        <p>インボイスを1枚貼るだけで、中の全商品をAIが読み取り、過去の価格と照合して「値上がり／値下がり／新規」を表示します。確認して取り込むと履歴に反映されます。</p></div>
-        <div class="card-b"><div class="drop"><b>インボイス（PDF・画像）を選択</b><br><span class="note">仕入先・通貨・各商品の単価を自動抽出します</span><br>
-        <button class="btn-primary" id="pickInvoice">ファイルを選択</button></div></div></div>`;
-      return;
+/* ---------- filtering / sorting ---------- */
+function filtered(){
+  const f=state.filter;const q=f.q.trim().toLowerCase();
+  let arr=state.products.filter(p=>{
+    if(f.cat&&p.category!==f.cat)return false;
+    if(f.status&&p.status!==f.status)return false;
+    if(f.yakkan&&p.yakkan!==f.yakkan)return false;
+    if(q){
+      const hay=(p.name+" "+p.name_en+" "+p.maker+" "+p.tags.join(" ")+" "+p.note).toLowerCase();
+      if(!hay.includes(q))return false;
     }
-    if(checkState.loading){ el.innerHTML=`<div class="card"><div class="card-b"><div class="ex-spinner"><span class="spin"></span>AIがインボイスを読み取っています…</div></div></div>`; return; }
-    if(checkState.error){ el.innerHTML=`<div class="card"><div class="card-b"><div class="ex-warn">読み取れませんでした。<br>${esc(checkState.error)}</div>
-      <p class="note">APIキーが未設定/誤りの可能性。上部「AI設定」で <b>sk-ant-</b> キーを登録してください。</p>
-      <button class="btn-ghost" id="checkReset">やり直す</button></div></div>`; return; }
-    // review
-    const supOpts=`<option value="">（新規：下の名前で登録）</option>`+suppliers.map(s=>`<option value="${s.id}" ${checkState.supplierId===s.id?"selected":""}>${esc(s.name)}</option>`).join("");
-    const warns=Array.isArray(checkState.warnings)?checkState.warnings.filter(Boolean):[];
-    let rowsHtml=checkState.items.map((it,i)=>{
-      const prodOpts=`<option value="">（無視）</option>`+products.map(p=>`<option value="${p.id}" ${it.productId===p.id?"selected":""}>${esc(p.name)}</option>`).join("")
-        +`<option value="__new__" ${it.productId==="__new__"?"selected":""}>＋ 新商品として登録「${esc(it.rawName)}」</option>`;
-      const d=computeDiff(it);
-      return `<tr data-i="${i}">
-        <td>${esc(it.rawName)}</td>
-        <td><select class="ci-prod" data-i="${i}">${prodOpts}</select></td>
-        <td class="num"><input class="ci-qty num" data-i="${i}" value="${esc(it.qty)}" style="width:70px;"></td>
-        <td class="num"><input class="ci-price num" data-i="${i}" value="${esc(it.unitPrice)}" style="width:96px;"></td>
-        <td>${d.html}</td>
-        <td>${d.prev}</td>
-      </tr>`;
-    }).join("");
-    el.innerHTML=`<div class="card">
-      <div class="card-h"><h2>読み取り結果の確認</h2><p>${esc(checkState.fileName||"")} を読み取りました。仕入先と商品の紐付けを確認し、問題なければ取り込んでください。</p></div>
-      <div class="card-b">
-        ${warns.length?`<div class="ex-note">⚠ AIが要確認とした項目：${warns.map(esc).join(" ／ ")}</div>`:""}
-        <div class="rev-top">
-          <div class="rfield"><label>仕入先（検出）</label><input id="ci-supname" value="${esc(checkState.supplierName)}"></div>
-          <div class="rfield"><label>紐付け先 仕入先</label><select id="ci-supid">${supOpts}</select></div>
-          <div class="rfield"><label>通貨</label><input id="ci-currency" value="${esc(checkState.currency)}"></div>
-          <div class="rfield"><label>日付</label><input type="date" id="ci-date" value="${esc(checkState.date)}"></div>
-        </div>
-        <table class="rtable"><thead><tr><th>読取名</th><th>紐付け先 商品</th><th class="num">数量</th><th class="num">単価</th><th>判定</th><th>前回</th></tr></thead>
-        <tbody>${rowsHtml}</tbody></table>
-        <div class="rev-foot"><span class="note">「無視」の行は取り込みません。新商品/新別名は取り込み時に自動登録します。</span>
-          <button class="btn-ghost" id="checkReset">やり直す</button>
-          <button class="btn-primary" id="checkApply">取り込む</button></div>
-      </div></div>`;
-  }
-  function computeDiff(it){
-    const supId=checkState.supplierId;
-    if(!it.productId||it.productId==="__new__"){ 
-      if(it.productId==="__new__") return {html:'<span class="stat new">新商品</span>',prev:'<span class="prev">—</span>'};
-      return {html:'<span class="stat skip">無視</span>',prev:'<span class="prev">—</span>'};
+    return true;
+  });
+  const s=state.sort;
+  arr.sort((a,b)=>{
+    if(s==="name")return a.name.localeCompare(b.name,"ja");
+    if(s==="updated")return (b.updated_at||"").localeCompare(a.updated_at||"");
+    if(s==="docs")return a.documents.length-b.documents.length;
+    if(s==="category"){
+      const ai=CATEGORIES.findIndex(c=>c.key===a.category),bi=CATEGORIES.findIndex(c=>c.key===b.category);
+      return ai-bi||a.name.localeCompare(b.name,"ja");
     }
-    if(!supId){ return {html:'<span class="stat new">新規(新仕入先)</span>',prev:'<span class="prev">—</span>'}; }
-    const lp=latestPrice(it.productId,supId);
-    if(!lp){ return {html:'<span class="stat new">新規</span>',prev:'<span class="prev">履歴なし</span>'}; }
-    const nowCur=(checkState.currency||"").toUpperCase(), prevCur=(lp.currency||"").toUpperCase();
-    const prevTxt=`<span class="prev">前回 ${fmtN(num(lp.unitPrice))} ${esc(lp.currency||"")}（${esc(lp.date||"")}）</span>`;
-    if(nowCur!==prevCur){ return {html:'<span class="stat cur">通貨違い</span>',prev:prevTxt}; }
-    const was=num(lp.unitPrice), now=num(it.unitPrice);
-    if(!was){ return {html:'<span class="stat same">—</span>',prev:prevTxt}; }
-    const delta=(now-was)/was*100;
-    if(Math.abs(delta)<0.05) return {html:'<span class="stat same">据え置き</span>',prev:prevTxt};
-    if(delta>0) return {html:`<span class="stat up">▲ 値上がり +${delta.toFixed(1)}%</span>`,prev:prevTxt};
-    return {html:`<span class="stat down">▼ 値下がり ${delta.toFixed(1)}%</span>`,prev:prevTxt};
-  }
-  async function onInvoicePicked(file){
-    if(!file) return;
-    const id=uid();
-    checkState={loading:true,fileName:file.name,fileId:id}; switchTab("check"); renderCheck();
-    try{ await IDB.put({id,name:file.name,type:file.type,size:file.size,blob:file}); }catch(e){}
-    supaUpload(id,file,file.type).catch(()=>{});
-    try{
-      const r=await extractInvoice(file,file.type||"application/pdf");
-      const items=(Array.isArray(r.items)?r.items:[]).map(it=>{ const mp=matchProduct(it.name);
-        return {rawName:it.name||"", qty:(it.qty==null?"":it.qty), unitPrice:(it.unitPrice==null?"":it.unitPrice), productId:mp?mp.id:"" }; });
-      const ms=matchSupplier(r.supplier||"");
-      checkState={loading:false, fileId:id, fileName:file.name, supplierName:r.supplier||"", supplierId:ms?ms.id:"",
-        currency:(r.currency||"").toUpperCase(), date:r.invoiceDate||today(), items, warnings:r.warnings||[]};
-    }catch(err){ checkState={error:err.message||String(err)}; }
-    renderCheck();
-  }
-  function applyCheck(){
-    const cs=checkState; if(!cs||!cs.items) return;
-    // resolve supplier
-    let supId=cs.supplierId;
-    if(!supId){ const nm=(cs.supplierName||"").trim()||"（無名の仕入先）"; const ex=matchSupplier(nm);
-      if(ex) supId=ex.id; else{ supId=uid(); suppliers.push({id:supId,name:nm,currency:cs.currency||"",aliases:[]}); } }
-    else { const s=suppliers.find(x=>x.id===supId); if(s&&cs.supplierName&&norm(s.name)!==norm(cs.supplierName)&&!(s.aliases||[]).some(a=>norm(a)===norm(cs.supplierName))){ s.aliases=s.aliases||[]; s.aliases.push(cs.supplierName.trim()); } }
-    let added=0;
-    cs.items.forEach(it=>{
-      if(!it.productId) return; // 無視
-      let prodId=it.productId;
-      if(prodId==="__new__"){ prodId=uid(); products.push({id:prodId,name:(it.rawName||"新商品").trim(),aliases:[],note:""}); }
-      else { const p=prodById(prodId); if(p&&it.rawName&&norm(p.name)!==norm(it.rawName)&&!(p.aliases||[]).some(a=>norm(a)===norm(it.rawName))){ p.aliases=p.aliases||[]; p.aliases.push(it.rawName.trim()); } }
-      prices.push({id:uid(),productId:prodId,supplierId:supId,unitPrice:String(num(it.unitPrice)),currency:(cs.currency||"").toUpperCase(),date:cs.date||today(),source:"invoice",added:Date.now(),fileId:cs.fileId,fileName:cs.fileName});
-      added++;
-    });
-    db.products=products; db.suppliers=suppliers; db.prices=prices;
-    save(); checkState=null; renderAll(); switchTab("compare");
-    toast(added+"件の価格を取り込みました");
-  }
+    return 0;
+  });
+  return arr;
+}
 
-  /* ================= MASTER VIEW ================= */
-  function renderMaster(){
-    const el=document.getElementById("masterArea");
-    const curList=Object.keys(db.rates).sort();
-    el.innerHTML=`<div class="ms">
-      <div class="card"><div class="card-h"><h2>商品マスタ（名寄せ）</h2><p>同じ商品でもインボイスごとに表記が違うことがあります。別名を登録しておくと、AI読取時に自動で同じ商品に紐付きます（カンマ区切り）。</p></div>
-        <div class="card-b"><div class="ms" id="mProducts"></div><button class="madd" id="mAddProd" style="margin-top:10px;">＋ 商品を追加</button></div></div>
-      <div class="card"><div class="card-h"><h2>仕入先</h2><p>仕入先と既定通貨。インボイスの仕入先名がブレても別名で紐付けできます。</p></div>
-        <div class="card-b"><div class="ms" id="mSuppliers"></div><button class="madd" id="mAddSup" style="margin-top:10px;">＋ 仕入先を追加</button></div></div>
-      <div class="card"><div class="card-h"><h2>参考レート（円換算用・概算）</h2><p>比較表の「≈円換算」に使う、1通貨あたりの円。手入力の概算です（例：KRW=0.11、USD=158）。素の通貨価格が常に正で、これは並べ替えの目安です。</p></div>
-        <div class="card-b"><div class="ms" id="mRates"></div><button class="madd" id="mAddRate" style="margin-top:10px;">＋ レートを追加</button></div></div>
-    </div>`;
-    document.getElementById("mProducts").innerHTML=products.map(p=>`<div class="mrow" data-pid="${p.id}">
-      <input class="mp-name" data-pid="${p.id}" value="${esc(p.name)}" placeholder="商品名" style="width:200px;">
-      <input class="mp-alias grow" data-pid="${p.id}" value="${esc((p.aliases||[]).join(", "))}" placeholder="別名（カンマ区切り）">
-      <button class="row-del" data-delprod="${p.id}" title="削除">×</button></div>`).join("")||`<p class="m-hint">まだありません。</p>`;
-    document.getElementById("mSuppliers").innerHTML=suppliers.map(s=>`<div class="mrow" data-sid="${s.id}">
-      <input class="msu-name grow" data-sid="${s.id}" value="${esc(s.name)}" placeholder="仕入先名">
-      <input class="msu-cur" data-sid="${s.id}" value="${esc(s.currency||"")}" placeholder="通貨" style="width:90px;">
-      <input class="msu-alias grow" data-sid="${s.id}" value="${esc((s.aliases||[]).join(", "))}" placeholder="別名（カンマ区切り）">
-      <button class="row-del" data-delsup="${s.id}" title="削除">×</button></div>`).join("")||`<p class="m-hint">まだありません。</p>`;
-    document.getElementById("mRates").innerHTML=curList.map(c=>`<div class="mrow" data-cur="${c}">
-      <input value="${esc(c)}" disabled style="width:90px;font-weight:700;">
-      <span class="note">1 ${esc(c)} =</span>
-      <input class="mr-val" data-cur="${c}" value="${esc(db.rates[c])}" placeholder="円" style="width:120px;">
-      <span class="note">円</span>
-      <button class="row-del" data-delrate="${c}" title="削除">×</button></div>`).join("")||`<p class="m-hint">レート未設定。通貨が違う仕入先を円換算で比べるには追加してください。</p>`;
+/* ---------- render: facets + stats ---------- */
+function renderFacets(){
+  const counts=k=>state.products.reduce((m,p)=>{m[p[k]]=(m[p[k]]||0)+1;return m;},{});
+  const cc=counts("category"),sc=counts("status"),yc=counts("yakkan");
+
+  let html=`<button class="facet-item ${!state.filter.cat?'active':''}" data-cat="">
+    <span>すべて</span><span class="count">${state.products.length}</span></button>`;
+  CATEGORIES.forEach(c=>{
+    const n=cc[c.key]||0;if(n===0&&state.filter.cat!==c.key)return;
+    html+=`<button class="facet-item ${state.filter.cat===c.key?'active':''}" data-cat="${esc(c.key)}">
+      <span>${esc(c.label)}</span><span class="count">${n}</span></button>`;
+  });
+  $("#catFacets").innerHTML=html;
+
+  const stCol={"取扱中":"","検討中":"","取扱終了":""};
+  let sh=`<button class="facet-item ${!state.filter.status?'active':''}" data-status="">
+    <span>すべて</span><span class="count">${state.products.length}</span></button>`;
+  Object.keys(stCol).forEach(k=>{sh+=`<button class="facet-item ${state.filter.status===k?'active':''}" data-status="${k}">
+    <span>${k}</span><span class="count">${sc[k]||0}</span></button>`;});
+  $("#statusFacets").innerHTML=sh;
+
+  let yh=`<button class="facet-item ${!state.filter.yakkan?'active':''}" data-yakkan="">
+    <span>すべて</span><span class="count">${state.products.length}</span></button>`;
+  ["取得済","申請中","不要","未対応"].forEach(k=>{yh+=`<button class="facet-item ${state.filter.yakkan===k?'active':''}" data-yakkan="${k}">
+    <span>${k}</span><span class="count">${yc[k]||0}</span></button>`;});
+  $("#yakkanFacets").innerHTML=yh;
+
+  $$("#catFacets [data-cat]").forEach(b=>b.onclick=()=>{state.filter.cat=b.dataset.cat||null;closeSidebar();render();});
+  $$("#statusFacets [data-status]").forEach(b=>b.onclick=()=>{state.filter.status=b.dataset.status||null;closeSidebar();render();});
+  $$("#yakkanFacets [data-yakkan]").forEach(b=>b.onclick=()=>{state.filter.yakkan=b.dataset.yakkan||null;closeSidebar();render();});
+}
+function renderStats(){
+  const tot=state.products.length;
+  const active=state.products.filter(p=>p.status==="取扱中").length;
+  const noDocs=state.products.filter(p=>p.documents.length===0).length;
+  const yakkanTodo=state.products.filter(p=>p.yakkan==="未対応"||p.yakkan==="申請中").length;
+  $("#stats").innerHTML=`
+    <div class="stat"><div class="num">${tot}</div><div class="lbl">登録製剤</div></div>
+    <div class="stat"><div class="num">${active}</div><div class="lbl">取扱中</div></div>
+    <div class="stat ${noDocs?'warn':''}"><div class="num">${noDocs}</div><div class="lbl">書類なし（要対応）</div></div>
+    <div class="stat ${yakkanTodo?'warn':''}"><div class="num">${yakkanTodo}</div><div class="lbl">薬監 未取得</div></div>`;
+}
+
+/* ---------- render: filters bar + products ---------- */
+function statusChip(s){const m={"取扱中":"green","検討中":"amber","取扱終了":"gray"};return `<span class="chip ${m[s]||'gray'}">${esc(s)}</span>`;}
+function yakkanChip(y){const m={"取得済":"green","申請中":"amber","不要":"gray","未対応":"rose"};return `<span class="chip ${m[y]||'gray'}">薬監:${esc(y)}</span>`;}
+
+function renderActiveFilters(){
+  const f=state.filter;const pills=[];
+  if(f.cat)pills.push(["cat",catOf(f.cat).label]);
+  if(f.status)pills.push(["status",f.status]);
+  if(f.yakkan)pills.push(["yakkan","薬監:"+f.yakkan]);
+  if(f.q)pills.push(["q",`"${f.q}"`]);
+  $("#activeFilters").innerHTML=pills.map(([k,v])=>
+    `<span class="fpill">${esc(v)}<button data-clear="${k}" aria-label="解除">×</button></span>`).join("");
+  $$("#activeFilters [data-clear]").forEach(b=>b.onclick=()=>{
+    const k=b.dataset.clear;if(k==="q"){state.filter.q="";$("#search").value="";}else state.filter[k]=null;render();});
+}
+
+function render(){
+  renderFacets();renderStats();renderActiveFilters();
+  const arr=filtered();
+  $("#resultCount").innerHTML=`<b>${arr.length}</b> 件`;
+  const area=$("#productArea");
+  if(arr.length===0){
+    area.innerHTML=`<div class="empty"><h3>該当する製剤がありません</h3><p>${state.products.length===0?'右上の「製剤を追加」かCSV取込で登録を始めましょう。':'検索条件を変えてみてください。'}</p></div>`;
+    return;
   }
+  if(state.view==="grid"){
+    area.innerHTML=`<div class="grid">`+arr.map(cardHtml).join("")+`</div>`;
+    $$(".card[data-id]").forEach(c=>c.onclick=()=>openDrawer(c.dataset.id));
+  }else{
+    area.innerHTML=tableHtml(arr);
+    $$(".tbl tbody tr[data-id]").forEach(r=>r.onclick=()=>openDrawer(r.dataset.id));
+  }
+}
+function cardHtml(p){
+  const c=catOf(p.category);
+  const tags=p.tags.slice(0,3).map(t=>`<span class="chip tag">${esc(t)}</span>`).join("");
+  const dc=p.documents.length;
+  return `<article class="card" data-id="${p.id}" style="--cat-color:${c.color}">
+    <div class="cat-eyebrow">${esc(c.label)}</div>
+    <div class="name">${esc(p.name)}</div>
+    ${p.name_en?`<div class="name-en">${esc(p.name_en)}</div>`:""}
+    ${p.maker?`<div class="maker">${esc(p.maker)}${p.origin?` ・ ${esc(p.origin)}`:""}</div>`:""}
+    <div class="chips">${statusChip(p.status)}${yakkanChip(p.yakkan)}${tags}</div>
+    <div class="footer">
+      <span class="doc-count ${dc?'':'zero'}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        書類 ${dc}件
+      </span>
+    </div>
+  </article>`;
+}
+function tableHtml(arr){
+  return `<table class="tbl"><thead><tr>
+    <th>商品名</th><th>カテゴリー</th><th>メーカー</th><th>ステータス</th><th>薬監</th><th>書類</th>
+    </tr></thead><tbody>`+arr.map(p=>{
+    const c=catOf(p.category);
+    return `<tr data-id="${p.id}">
+      <td><span class="t-name">${esc(p.name)}</span>${p.name_en?`<br><span class="t-en">${esc(p.name_en)}</span>`:""}</td>
+      <td><span class="chip" style="background:${c.color}1a;color:${c.color}">${esc(c.label)}</span></td>
+      <td>${esc(p.maker||"—")}</td>
+      <td>${statusChip(p.status)}</td>
+      <td>${esc(p.yakkan)}</td>
+      <td class="${p.documents.length?'':'doc-count zero'}">${p.documents.length}件</td>
+    </tr>`;
+  }).join("")+`</tbody></table>`;
+}
 
-  /* ================= shared ================= */
-  function setMobile(active){ if(window.innerWidth>860) return;
-    document.getElementById("plistPane").dataset.mh=active?"1":"0";
-    document.getElementById("prodDetailPane").dataset.mh=active?"0":"1"; }
-  let toastTimer;
-  function toast(m,undoFn,ms){ const t=document.getElementById("toast");
-    t.innerHTML=esc(m)+(undoFn?' <button class="toast-undo">元に戻す</button>':'');
-    t.classList.add("show"); if(undoFn){ t.querySelector(".toast-undo").onclick=()=>{ t.classList.remove("show"); undoFn(); }; }
-    clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),ms||(undoFn?7000:1900)); }
-  function renderAll(){ renderProdList(); renderProdDetail(); if(activeTab==="check") renderCheck(); if(activeTab==="master") renderMaster(); renderBackupState(); }
-  function switchTab(tab){ activeTab=tab;
-    document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));
-    document.getElementById("view-compare").style.display=tab==="compare"?"grid":"none";
-    document.getElementById("view-check").style.display=tab==="check"?"block":"none";
-    document.getElementById("view-master").style.display=tab==="master"?"block":"none";
-    if(tab==="check") renderCheck(); if(tab==="master") renderMaster(); }
-
-  /* ---- product CRUD ---- */
-  function newProduct(){ const p={id:uid(),name:"新しい商品",aliases:[],note:""}; products.push(p); db.products=products; selProd=p.id; save(); switchTab("compare"); renderAll();
-    setTimeout(()=>{ switchTab("master"); renderMaster(); const inp=document.querySelector(`.mp-name[data-pid="${p.id}"]`); if(inp){ inp.focus(); inp.select(); } },10); }
-  function delProduct(id){ const p=prodById(id); if(!p) return; const cnt=prices.filter(x=>x.productId===id).length;
-    if(!confirm(`「${p.name}」を削除します。価格履歴${cnt}件も消えます。よろしいですか？`)) return;
-    const idx=products.findIndex(x=>x.id===id); products.splice(idx,1);
-    const removedPrices=prices.filter(x=>x.productId===id); for(let i=prices.length-1;i>=0;i--) if(prices[i].productId===id) prices.splice(i,1);
-    db.products=products; db.prices=prices; if(selProd===id) selProd=null; save(); renderAll();
-    toast("商品を削除しました",()=>{ products.splice(Math.min(idx,products.length),0,p); removedPrices.forEach(x=>prices.push(x)); db.products=products; db.prices=prices; selProd=id; save(); renderAll(); }); }
-
-  /* ---- add price (manual) modal ---- */
-  function openAddPrice(){ const p=prodById(selProd); if(!p) return;
-    const supOpts=suppliers.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("");
-    document.getElementById("histTitle").textContent="価格を追加 — "+p.name;
-    document.getElementById("histBody").innerHTML=`
-      <div class="modal-field"><label>仕入先</label>
-        <select id="ap-sup">${supOpts||'<option value="">（先にマスタで仕入先を追加）</option>'}<option value="__new__">＋ 新規 仕入先</option></select></div>
-      <div id="ap-newsup" style="display:none;"><div class="modal-field"><label>新規 仕入先名</label><input id="ap-supname" placeholder="仕入先名"></div></div>
-      <div style="display:grid;grid-template-columns:1fr 110px 150px;gap:10px;">
-        <div class="modal-field"><label>単価</label><input id="ap-price" inputmode="decimal" placeholder="0" style="font-family:'JetBrains Mono',monospace;"></div>
-        <div class="modal-field"><label>通貨</label><input id="ap-cur" placeholder="KRW" style="font-family:'JetBrains Mono',monospace;"></div>
-        <div class="modal-field"><label>日付</label><input type="date" id="ap-date" value="${today()}"></div>
+/* ---------- drawer ---------- */
+function openDrawer(id){
+  const p=state.products.find(x=>x.id===id);if(!p)return;state.current=p;
+  const c=catOf(p.category);
+  const groups={};DOC_TYPES.forEach(t=>groups[t]=[]);
+  p.documents.forEach(d=>{(groups[d.type]||groups["その他"]).push(d);});
+  let docsHtml="";
+  DOC_TYPES.forEach(t=>{
+    if(!groups[t].length)return;
+    docsHtml+=`<div class="doc-group"><div class="doc-group-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      ${esc(t)}</div>`;
+    groups[t].forEach(d=>{
+      docsHtml+=`<div class="doc">
+        <span class="dico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+        <span class="dname">${esc(d.name||t)}<small>${esc(d.url||"")}</small></span>
+        ${d.url?`<a class="open" href="${esc(d.url)}" target="_blank" rel="noopener">開く</a>`:""}
       </div>`;
-    document.getElementById("histFoot").innerHTML=`<button class="btn-ghost" id="histClose2">キャンセル</button><button class="btn-primary" id="ap-save">追加</button>`;
-    showModal("histModal");
-    const supSel=document.getElementById("ap-sup");
-    if(supSel){ const s=suppliers.find(x=>x.id===supSel.value); if(s&&s.currency){ document.getElementById("ap-cur").value=s.currency; } }
+    });
+    docsHtml+=`</div>`;
+  });
+  if(!p.documents.length)docsHtml=`<div class="no-docs">関連書類はまだありません。「編集」から追加できます。</div>`;
+
+  const tags=p.tags.map(t=>`<span class="chip tag">${esc(t)}</span>`).join("");
+  $("#drawer").innerHTML=`
+    <div class="drawer-head" style="border-bottom-color:${c.color}33">
+      <div class="cat-eyebrow" style="color:${c.color}">${esc(c.label)}</div>
+      <button class="icon-btn drawer-close" id="drawerClose" aria-label="閉じる">✕</button>
+      <h2>${esc(p.name)}</h2>
+      ${p.name_en?`<div class="name-en">${esc(p.name_en)}</div>`:""}
+      <div class="chips">${statusChip(p.status)}${yakkanChip(p.yakkan)}</div>
+    </div>
+    <div class="drawer-body">
+      <div class="meta-grid">
+        <div class="meta-item"><div class="k">メーカー</div><div class="v">${esc(p.maker||"—")}</div></div>
+        <div class="meta-item"><div class="k">原産国</div><div class="v">${esc(p.origin||"—")}</div></div>
+        ${tags?`<div class="meta-item full"><div class="k">タグ</div><div class="v" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">${tags}</div></div>`:""}
+        ${p.note?`<div class="meta-item full"><div class="k">メモ</div><div class="note-box">${esc(p.note)}</div></div>`:""}
+      </div>
+      <div class="section-label">関連書類 ・ ${p.documents.length}件</div>
+      ${docsHtml}
+    </div>
+    <div class="drawer-foot">
+      <button class="btn-ghost" id="drawerEdit">編集</button>
+      <button class="btn-ghost danger" id="drawerDelete">削除</button>
+    </div>`;
+  $("#drawer").classList.add("show");$("#drawer").setAttribute("aria-hidden","false");
+  $("#scrim").classList.add("show");
+  $("#drawerClose").onclick=closeDrawer;
+  $("#drawerEdit").onclick=()=>{closeDrawer();openEdit(p);};
+  $("#drawerDelete").onclick=async()=>{
+    if(!confirm(`「${p.name}」を削除します。よろしいですか？`))return;
+    await store.remove(p.id);if(!sb){}else state.products=await store.load();
+    if(sb)state.products=await store.load();
+    closeDrawer();render();toast("削除しました");
+  };
+}
+function closeDrawer(){$("#drawer").classList.remove("show");$("#drawer").setAttribute("aria-hidden","true");$("#scrim").classList.remove("show");}
+
+/* ---------- edit modal ---------- */
+function fillCategorySelects(){
+  const opt=CATEGORIES.map(c=>`<option value="${esc(c.key)}">${esc(c.label)}</option>`).join("");
+  $("#f_category").innerHTML=opt;
+  $("#newDocType").innerHTML=DOC_TYPES.map(t=>`<option>${esc(t)}</option>`).join("");
+}
+function openEdit(p){
+  state.editing=p?JSON.parse(JSON.stringify(p)):{id:uid(),documents:[],tags:[]};
+  state.draftDocs=state.editing.documents?[...state.editing.documents]:[];
+  $("#editTitle").textContent=p?"製剤を編集":"製剤を追加";
+  $("#f_name").value=state.editing.name||"";
+  $("#f_name_en").value=state.editing.name_en||"";
+  $("#f_maker").value=state.editing.maker||"";
+  $("#f_category").value=state.editing.category||"フィラー";
+  $("#f_origin").value=state.editing.origin||"";
+  $("#f_status").value=state.editing.status||"取扱中";
+  $("#f_yakkan").value=state.editing.yakkan||"未対応";
+  $("#f_tags").value=(state.editing.tags||[]).join(", ");
+  $("#f_note").value=state.editing.note||"";
+  renderDraftDocs();
+  $("#uploadLabel").className="file-label"+(sb?"":" disabled");
+  $("#uploadHint").textContent=sb?"PDF・画像などをアップロードするとStorageに保存されます。":"アップロードはSupabase接続時のみ。今はファイルURLを貼り付けてください。";
+  $("#editScrim").classList.add("show");
+}
+function renderDraftDocs(){
+  $("#docRows").innerHTML=state.draftDocs.map((d,i)=>`
+    <div class="doc-row">
+      <select data-i="${i}" data-k="type">${DOC_TYPES.map(t=>`<option ${t===d.type?"selected":""}>${esc(t)}</option>`).join("")}</select>
+      <input data-i="${i}" data-k="name" value="${esc(d.name||"")}" placeholder="書類名">
+      <button class="rm" data-rm="${i}" title="削除">✕</button>
+      <input data-i="${i}" data-k="url" value="${esc(d.url||"")}" placeholder="URL" style="grid-column:1/3">
+    </div>`).join("");
+  $$("#docRows [data-k]").forEach(el=>el.onchange=e=>{
+    const i=+e.target.dataset.i,k=e.target.dataset.k;state.draftDocs[i][k]=e.target.value;});
+  $$("#docRows [data-rm]").forEach(b=>b.onclick=()=>{state.draftDocs.splice(+b.dataset.rm,1);renderDraftDocs();});
+}
+async function addDraftDocFromInputs(){
+  const type=$("#newDocType").value,name=$("#newDocName").value.trim(),url=$("#newDocUrl").value.trim();
+  if(!url){toast("URLを入力するか、ファイルをアップロードしてください");return;}
+  state.draftDocs.push({id:uid(),type,name:name||type,url});
+  $("#newDocName").value="";$("#newDocUrl").value="";renderDraftDocs();
+}
+async function saveEdit(){
+  const name=$("#f_name").value.trim();
+  if(!name){toast("商品名を入力してください");return;}
+  const p=state.editing;
+  p.name=name;
+  p.name_en=$("#f_name_en").value.trim();
+  p.maker=$("#f_maker").value.trim();
+  p.category=$("#f_category").value;
+  p.origin=$("#f_origin").value.trim();
+  p.status=$("#f_status").value;
+  p.yakkan=$("#f_yakkan").value;
+  p.tags=$("#f_tags").value.split(",").map(s=>s.trim()).filter(Boolean);
+  p.note=$("#f_note").value;
+  p.documents=state.draftDocs;
+  const ok=await store.save(normalize(p));
+  if(!ok)return;
+  if(sb)state.products=await store.load();
+  $("#editScrim").classList.remove("show");render();toast("保存しました");
+}
+
+/* ---------- settings ---------- */
+function openSettings(){
+  $("#s_url").value=cfg.url||"";$("#s_key").value=cfg.key||"";$("#s_bucket").value=cfg.bucket||"catalogs";
+  $("#sqlCode").textContent=
+`create table if not exists products (
+  id text primary key,
+  name text not null,
+  name_en text, category text, maker text,
+  origin text, status text, yakkan text,
+  tags text[] default '{}',
+  note text,
+  documents jsonb default '[]',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table products enable row level security;
+create policy "anon all" on products for all
+  using (true) with check (true);`;
+  $("#setScrim").classList.add("show");
+}
+async function saveSettings(){
+  cfg.url=$("#s_url").value.trim();cfg.key=$("#s_key").value.trim();cfg.bucket=$("#s_bucket").value.trim()||"catalogs";
+  localStorage.setItem(LS.config,JSON.stringify(cfg));
+  initSupabase();state.products=await store.load();render();
+  toast(sb?"クラウドに接続しました":"接続情報を保存しました");
+}
+
+/* ---------- CSV ---------- */
+function parseCSV(text){
+  const rows=[];let row=[],val="",q=false;
+  for(let i=0;i<text.length;i++){const ch=text[i];
+    if(q){if(ch==='"'){if(text[i+1]==='"'){val+='"';i++;}else q=false;}else val+=ch;}
+    else{if(ch==='"')q=true;else if(ch===","){row.push(val);val="";}
+      else if(ch==="\n"){row.push(val);rows.push(row);row=[];val="";}
+      else if(ch==="\r"){}else val+=ch;}}
+  if(val!==""||row.length){row.push(val);rows.push(row);}
+  return rows.filter(r=>r.some(c=>c.trim()!==""));
+}
+function csvCell(s){s=s==null?"":String(s);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
+const CSV_HEADERS=["商品名","英名","カテゴリー","メーカー","原産国","ステータス","薬監証明","タグ","メモ","書類"];
+function docsToCsv(docs){return (docs||[]).map(d=>`${d.type}|${d.name||""}|${d.url||""}`).join(";");}
+function csvToDocs(s){if(!s)return [];return s.split(";").map(part=>{const[type,name,url]=part.split("|");
+  return {id:uid(),type:(type||"その他").trim(),name:(name||"").trim(),url:(url||"").trim()};}).filter(d=>d.url||d.name);}
+
+async function importCSV(file){
+  const text=await file.text();const rows=parseCSV(text);
+  if(rows.length<2){$("#csvResult").textContent="データ行が見つかりませんでした。";return;}
+  const header=rows[0].map(h=>h.trim());
+  const idx=n=>header.indexOf(n);
+  let added=0;
+  for(let r=1;r<rows.length;r++){
+    const c=rows[r];const get=n=>{const i=idx(n);return i>=0?(c[i]||"").trim():"";};
+    const name=get("商品名");if(!name)continue;
+    const p=normalize({
+      id:uid(),name,name_en:get("英名"),category:get("カテゴリー")||"その他",maker:get("メーカー"),
+      origin:get("原産国"),status:get("ステータス")||"取扱中",yakkan:get("薬監証明")||"未対応",
+      tags:get("タグ"),note:get("メモ"),documents:csvToDocs(get("書類"))
+    });
+    if(!CATEGORIES.some(x=>x.key===p.category))p.category="その他";
+    await store.save(p);added++;
   }
-
-  /* ---- history modal ---- */
-  function openHistory(supId){ const p=prodById(selProd); if(!p) return; const s=suppliers.find(x=>x.id===supId);
-    const list=prices.filter(x=>x.productId===p.id&&x.supplierId===supId).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.added||0)-(a.added||0));
-    document.getElementById("histTitle").textContent="価格履歴 — "+p.name+" / "+(s?s.name:"");
-    document.getElementById("histBody").innerHTML=list.length?`<table class="htable"><thead><tr><th>日付</th><th class="num">単価</th><th class="num">≈円</th><th>出典</th><th></th></tr></thead><tbody>`+
-      list.map(x=>{ const j=toJPY(num(x.unitPrice),x.currency); return `<tr><td>${esc(x.date||"—")}</td><td class="num">${fmtN(num(x.unitPrice))} ${esc(x.currency||"")}</td><td class="num">${j!=null?("¥"+fmtN(j,0)):"—"}</td><td>${x.source==="invoice"?"インボイス":"手入力"}</td><td class="num">${x.fileId?`<button class="btn-ghost" data-openf="${x.fileId}">原本</button>`:""} <button class="row-del" data-delprice="${x.id}">×</button></td></tr>`; }).join("")+`</tbody></table>`
-      :`<p class="note">履歴がありません。</p>`;
-    document.getElementById("histFoot").innerHTML=`<button class="btn-ghost" id="histClose2">閉じる</button>`;
-    showModal("histModal");
-  }
-  async function openStoredFile(id){ const blob=await getFileBlob(id);
-    if(blob){ const url=URL.createObjectURL(blob); window.open(url,"_blank"); setTimeout(()=>URL.revokeObjectURL(url),60000); return; }
-    if(supaOn()){ window.open(supaFileUrl(id),"_blank"); return; } toast("ファイルが見つかりません"); }
-
-  /* ---- backup / restore ---- */
-  async function doBackup(){ let files=[];
-    try{ const recs=await IDB.all(); for(const r of recs){ files.push({id:r.id,name:r.name,type:r.type,size:r.size,dataB64:await blobToB64(r.blob)}); } }catch(e){}
-    const payload={app:"pricing",version:1,exportedAt:new Date().toISOString(),db:{products,suppliers,prices,rates:db.rates,lastBackup:db.lastBackup},files};
-    const blob=new Blob([JSON.stringify(payload)],{type:"application/json"});
-    const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="pricing-backup_"+today()+".json"; a.click(); URL.revokeObjectURL(a.href);
-    db.lastBackup=Date.now(); save(); renderBackupState(); toast("バックアップを書き出しました（書類 "+files.length+"件）"); }
-  function doRestore(file){ const reader=new FileReader();
-    reader.onload=async()=>{ let p; try{ p=JSON.parse(reader.result); }catch(e){ toast("ファイルを読み取れませんでした"); return; }
-      if(!p||!p.db||!p.db.products){ toast("対応していないバックアップ形式です"); return; }
-      if(!confirm(`現在のデータを、このバックアップ（商品${(p.db.products||[]).length}件）で上書きします。よろしいですか？`)) return;
-      products.length=0;(p.db.products||[]).forEach(x=>products.push(x));
-      suppliers.length=0;(p.db.suppliers||[]).forEach(x=>suppliers.push(x));
-      prices.length=0;(p.db.prices||[]).forEach(x=>prices.push(x));
-      db.products=products; db.suppliers=suppliers; db.prices=prices; db.rates=p.db.rates||{}; if(p.db.lastBackup) db.lastBackup=p.db.lastBackup;
-      try{ for(const f of (p.files||[])){ await IDB.put({id:f.id,name:f.name,type:f.type,size:f.size,blob:b64ToBlob(f.dataB64,f.type)}); } }catch(e){}
-      selProd=null; save(); renderAll(); toast("バックアップから復元しました"); };
-    reader.readAsText(file); }
-  function renderBackupState(){ const el=document.getElementById("backupState"); if(!el) return;
-    if(!db.lastBackup){ el.textContent="未バックアップ"; el.className="state warn"; return; }
-    const days=Math.floor((Date.now()-db.lastBackup)/86400000);
-    el.textContent="最終BU "+fmtDate(db.lastBackup)+(days>=7?"・要更新":""); el.className="state"+(days>=7?" warn":""); }
-
-  /* ---- modal helpers ---- */
-  function showModal(id){ document.getElementById(id).classList.add("open"); }
-  function hideModal(id){ document.getElementById(id).classList.remove("open"); }
-
-  /* ================= EVENTS ================= */
-  document.querySelector(".tabs").addEventListener("click",e=>{ const b=e.target.closest(".tab"); if(b) switchTab(b.dataset.tab); });
-
-  // compare list
-  document.getElementById("btnNewProd").addEventListener("click",newProduct);
-  document.getElementById("prodSearch").addEventListener("input",e=>{ prodFilter=e.target.value; renderProdList(); });
-  document.getElementById("prodCards").addEventListener("click",e=>{ const c=e.target.closest(".pcard"); if(!c) return; selProd=c.dataset.id; renderProdList(); renderProdDetail(); });
-
-  // compare detail
-  document.getElementById("prodDetail").addEventListener("click",e=>{
-    if(e.target.id==="btnDelProd") return delProduct(selProd);
-    if(e.target.id==="btnEditProd"){ switchTab("master"); renderMaster(); const inp=document.querySelector(`.mp-name[data-pid="${selProd}"]`); if(inp){ inp.focus(); inp.scrollIntoView({block:"center"}); } return; }
-    if(e.target.id==="btnAddPrice") return openAddPrice();
-    if(e.target.dataset.hist) return openHistory(e.target.dataset.hist);
+  if(sb)state.products=await store.load();else state.products=await store.load();
+  render();$("#csvResult").innerHTML=`<b>${added}件</b> を取込みました。`;toast(`${added}件を取込みました`);
+}
+function exportCSV(){
+  const lines=[CSV_HEADERS.join(",")];
+  state.products.forEach(p=>{
+    lines.push([p.name,p.name_en,p.category,p.maker,p.origin,p.status,p.yakkan,p.tags.join(","),p.note,docsToCsv(p.documents)].map(csvCell).join(","));
   });
+  downloadFile("\ufeff"+lines.join("\n"),"lias_products.csv","text/csv;charset=utf-8");
+}
+function downloadTemplate(){
+  const sample=["リジュラン ヒーラー","Rejuran Healer","スキンブースター","PharmaResearch","韓国","取扱中","取得済","PN,院内人気","2ml x 1本","カタログ|2024カタログ|https://example.com/rejuran.pdf;薬監証明|薬監証明書|https://example.com/yakkan.pdf"];
+  const csv="\ufeff"+CSV_HEADERS.join(",")+"\n"+sample.map(csvCell).join(",");
+  downloadFile(csv,"lias_template.csv","text/csv;charset=utf-8");
+}
+function downloadFile(content,name,type){
+  const blob=new Blob([content],{type});const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href);
+}
 
-  // check view
-  document.getElementById("checkArea").addEventListener("click",e=>{
-    if(e.target.id==="pickInvoice") return document.getElementById("invoiceInput").click();
-    if(e.target.id==="checkReset"){ checkState=null; renderCheck(); return; }
-    if(e.target.id==="checkApply") return applyCheck();
-  });
-  document.getElementById("checkArea").addEventListener("change",e=>{
-    if(!checkState||!checkState.items) return;
-    if(e.target.id==="ci-supid"){ checkState.supplierId=e.target.value; renderCheck(); return; }
-    if(e.target.id==="ci-supname"){ checkState.supplierName=e.target.value; return; }
-    if(e.target.id==="ci-currency"){ checkState.currency=e.target.value.toUpperCase(); renderCheck(); return; }
-    if(e.target.id==="ci-date"){ checkState.date=e.target.value; return; }
-    if(e.target.classList.contains("ci-prod")){ checkState.items[+e.target.dataset.i].productId=e.target.value; renderCheck(); return; }
-  });
-  document.getElementById("checkArea").addEventListener("input",e=>{
-    if(!checkState||!checkState.items) return;
-    if(e.target.classList.contains("ci-qty")){ checkState.items[+e.target.dataset.i].qty=e.target.value; return; }
-    if(e.target.classList.contains("ci-price")){ checkState.items[+e.target.dataset.i].unitPrice=e.target.value; }
-  });
-  document.getElementById("invoiceInput").addEventListener("change",e=>{ if(e.target.files[0]) onInvoicePicked(e.target.files[0]); e.target.value=""; });
+/* ---------- sample seed ---------- */
+function seedSample(){
+  const s=[
+    ["ニューラミス ディープ","Neuramis Deep","フィラー","Medytox","韓国","取扱中","取得済","HA,鼻・顎","1ml/本"],
+    ["ジュベルック","Juvelook","スキンブースター","VAIM","韓国","取扱中","申請中","PDLLA,コラーゲン生成",""],
+    ["リジュラン ヒーラー","Rejuran Healer","スキンブースター","PharmaResearch","韓国","取扱中","取得済","PN,院内人気","2ml x 1本"],
+    ["コラスター","Collaster","機器","NEOMETIC","韓国","検討中","未対応","RF,コラーゲン",""],
+    ["ジャルプロ スーパーハイドロ","Jalupro Super Hydro","スキンブースター","Professional Dietetics","イタリア","取扱中","取得済","アミノ酸,保湿",""],
+    ["ボツラックス","Botulax","トキシン","Hugel","韓国","取扱中","取得済","ボツリヌス,100U","100単位"],
+    ["ミント リフト","MINT Lift","スレッド","HansBiomed","韓国","取扱中","取得済","PDO,リフト",""],
+    ["ネオビア オーガニック","NEAUVIA Organic","フィラー","Matex Lab","スイス","検討中","未対応","HA,PEG",""],
+    ["ベロテロ リバイブ","Belotero Revive","スキンブースター","Merz","ドイツ","検討中","申請中","HA,グリセロール",""],
+    ["LHALA ララパフ","LHALA","外用・ピーリング","LHALA","韓国","取扱中","不要","パフ,角質ケア",""],
+    ["ポテンツァ","Potenza","機器","Jeisys Medical","韓国","取扱中","取得済","RFマイクロニードル",""],
+    ["ザ・ミヒ","The MIHEE","スキンブースター","—","韓国","検討中","未対応","超低分子HA",""],
+  ];
+  state.products=s.map(a=>normalize({id:uid(),name:a[0],name_en:a[1],category:a[2],maker:a[3],origin:a[4],status:a[5],yakkan:a[6],tags:a[7],note:a[8]}));
+  persistLocal();
+}
 
-  // master view
-  document.getElementById("masterArea").addEventListener("click",e=>{
-    if(e.target.id==="mAddProd"){ products.push({id:uid(),name:"新しい商品",aliases:[],note:""}); db.products=products; save(); renderMaster(); return; }
-    if(e.target.id==="mAddSup"){ suppliers.push({id:uid(),name:"新しい仕入先",currency:"",aliases:[]}); db.suppliers=suppliers; save(); renderMaster(); return; }
-    if(e.target.id==="mAddRate"){ const c=prompt("通貨コード（例：KRW, USD）"); if(c){ db.rates[c.trim().toUpperCase()]=db.rates[c.trim().toUpperCase()]||""; save(); renderMaster(); } return; }
-    if(e.target.dataset.delprod){ const id=e.target.dataset.delprod; const p=prodById(id); if(confirm(`「${p?p.name:""}」を削除しますか？（価格履歴も消えます）`)){ delProduct(id); renderMaster(); } return; }
-    if(e.target.dataset.delsup){ const id=e.target.dataset.delsup; const cnt=prices.filter(x=>x.supplierId===id).length;
-      if(confirm(`この仕入先を削除しますか？関連する価格履歴${cnt}件も消えます。`)){ const i=suppliers.findIndex(x=>x.id===id); suppliers.splice(i,1); for(let k=prices.length-1;k>=0;k--) if(prices[k].supplierId===id) prices.splice(k,1); db.suppliers=suppliers; db.prices=prices; save(); renderMaster(); renderProdList(); } return; }
-    if(e.target.dataset.delrate){ delete db.rates[e.target.dataset.delrate]; save(); renderMaster(); return; }
+/* ---------- sidebar mobile ---------- */
+function closeSidebar(){$("#sidebar").classList.remove("open");}
+
+/* ---------- wire up ---------- */
+function bind(){
+  $("#search").oninput=e=>{state.filter.q=e.target.value;render();};
+  $("#sort").onchange=e=>{state.sort=e.target.value;render();};
+  $("#viewGrid").onclick=()=>{state.view="grid";$("#viewGrid").classList.add("active");$("#viewList").classList.remove("active");localStorage.setItem(LS.view,"grid");render();};
+  $("#viewList").onclick=()=>{state.view="list";$("#viewList").classList.add("active");$("#viewGrid").classList.remove("active");localStorage.setItem(LS.view,"list");render();};
+  $("#addBtn").onclick=()=>openEdit(null);
+  $("#menuToggle").onclick=()=>$("#sidebar").classList.toggle("open");
+  $("#scrim").onclick=()=>{closeDrawer();closeSidebar();};
+
+  // edit modal
+  $("#editClose").onclick=$("#editCancel").onclick=()=>$("#editScrim").classList.remove("show");
+  $("#editSave").onclick=saveEdit;
+  $("#addDocBtn").onclick=addDraftDocFromInputs;
+  $("#newDocFile").onchange=async e=>{
+    const file=e.target.files[0];if(!file)return;
+    if(!sb){toast("アップロードはSupabase接続時のみ。URLを貼り付けてください");e.target.value="";return;}
+    toast("アップロード中…");const url=await store.upload(file);
+    if(url){state.draftDocs.push({id:uid(),type:$("#newDocType").value,name:$("#newDocName").value.trim()||file.name,url});
+      $("#newDocName").value="";renderDraftDocs();toast("アップロードしました");}
+    e.target.value="";
+  };
+
+  // settings
+  $("#settingsBtn").onclick=openSettings;
+  $("#setClose").onclick=$("#setDone").onclick=()=>$("#setScrim").classList.remove("show");
+  $("#s_save").onclick=saveSettings;
+  $("#s_clear").onclick=async()=>{cfg={url:"",key:"",bucket:"catalogs"};localStorage.setItem(LS.config,JSON.stringify(cfg));initSupabase();state.products=await store.load();render();toast("接続を解除しました");};
+  $("#exportJson").onclick=()=>downloadFile(JSON.stringify(state.products,null,2),"lias_backup.json","application/json");
+  $("#importJson").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const arr=JSON.parse(await f.text());for(const p of arr)await store.save(normalize(p));state.products=await store.load();render();toast("復元しました");}catch(err){toast("読込失敗");}e.target.value="";};
+  $("#wipeBtn").onclick=()=>{if(confirm("この端末（ブラウザ）に保存したデータを全て消去します。クラウド側のデータは消えません。")){localStorage.removeItem(LS.products);if(!sb){state.products=[];render();}toast("消去しました");}};
+
+  // csv
+  $("#csvBtn").onclick=()=>{$("#csvResult").textContent="";$("#csvScrim").classList.add("show");};
+  $("#csvClose").onclick=$("#csvDone").onclick=()=>$("#csvScrim").classList.remove("show");
+  $("#csvTemplate").onclick=downloadTemplate;
+  $("#csvExport").onclick=exportCSV;
+  $("#csvFile").onchange=e=>{const f=e.target.files[0];if(f)importCSV(f);e.target.value="";};
+
+  document.addEventListener("keydown",e=>{
+    if(e.key==="Escape"){closeDrawer();$$(".modal-scrim").forEach(m=>m.classList.remove("show"));closeSidebar();}
+    if(e.key==="/"&&document.activeElement.tagName!=="INPUT"&&document.activeElement.tagName!=="TEXTAREA"){e.preventDefault();$("#search").focus();}
   });
-  document.getElementById("masterArea").addEventListener("input",e=>{
-    if(e.target.classList.contains("mp-name")){ const p=prodById(e.target.dataset.pid); if(p){ p.name=e.target.value; save(); } return; }
-    if(e.target.classList.contains("mp-alias")){ const p=prodById(e.target.dataset.pid); if(p){ p.aliases=e.target.value.split(",").map(s=>s.trim()).filter(Boolean); save(); } return; }
-    if(e.target.classList.contains("msu-name")){ const s=suppliers.find(x=>x.id===e.target.dataset.sid); if(s){ s.name=e.target.value; save(); } return; }
-    if(e.target.classList.contains("msu-cur")){ const s=suppliers.find(x=>x.id===e.target.dataset.sid); if(s){ s.currency=e.target.value.toUpperCase(); save(); } return; }
-    if(e.target.classList.contains("msu-alias")){ const s=suppliers.find(x=>x.id===e.target.dataset.sid); if(s){ s.aliases=e.target.value.split(",").map(t=>t.trim()).filter(Boolean); save(); } return; }
-    if(e.target.classList.contains("mr-val")){ db.rates[e.target.dataset.cur]=e.target.value; save(); }
-  });
+}
 
-  // history / add-price modal
-  document.getElementById("histModal").addEventListener("click",e=>{
-    if(e.target.id==="histModal"||e.target.id==="histClose"||e.target.id==="histClose2") return hideModal("histModal");
-    if(e.target.dataset.openf) return openStoredFile(e.target.dataset.openf);
-    if(e.target.dataset.delprice){ const id=e.target.dataset.delprice; const i=prices.findIndex(x=>x.id===id); if(i>=0){ prices.splice(i,1); db.prices=prices; save(); renderProdDetail(); renderProdList(); } hideModal("histModal"); return; }
-    if(e.target.id==="ap-save"){ saveAddPrice(); return; }
-  });
-  document.getElementById("histModal").addEventListener("change",e=>{
-    if(e.target.id==="ap-sup"){ document.getElementById("ap-newsup").style.display=e.target.value==="__new__"?"block":"none";
-      const s=suppliers.find(x=>x.id===e.target.value); if(s&&s.currency) document.getElementById("ap-cur").value=s.currency; }
-  });
-  function saveAddPrice(){ const p=prodById(selProd); if(!p) return;
-    let supId=document.getElementById("ap-sup").value;
-    if(supId==="__new__"){ const nm=(document.getElementById("ap-supname").value||"").trim(); if(!nm){ toast("仕入先名を入力してください"); return; } const ex=matchSupplier(nm); if(ex) supId=ex.id; else{ supId=uid(); suppliers.push({id:supId,name:nm,currency:(document.getElementById("ap-cur").value||"").toUpperCase(),aliases:[]}); db.suppliers=suppliers; } }
-    if(!supId){ toast("仕入先を選んでください"); return; }
-    const price=document.getElementById("ap-price").value, cur=(document.getElementById("ap-cur").value||"").toUpperCase(), date=document.getElementById("ap-date").value||today();
-    if(!price){ toast("単価を入力してください"); return; }
-    prices.push({id:uid(),productId:p.id,supplierId:supId,unitPrice:String(num(price)),currency:cur,date:date,source:"manual",added:Date.now()});
-    db.prices=prices; save(); hideModal("histModal"); renderProdDetail(); renderProdList(); toast("価格を追加しました"); }
-
-  // data tools
-  document.getElementById("btnBackup").addEventListener("click",doBackup);
-  document.getElementById("btnRestore").addEventListener("click",()=>document.getElementById("restoreInput").click());
-  document.getElementById("restoreInput").addEventListener("change",e=>{ if(e.target.files[0]) doRestore(e.target.files[0]); e.target.value=""; });
-  document.getElementById("btnAI").addEventListener("click",()=>{ document.getElementById("aiKeyInput").value=getKey(); showModal("aiModal"); });
-  document.getElementById("aiClose").addEventListener("click",()=>hideModal("aiModal"));
-  document.getElementById("aiModal").addEventListener("click",e=>{ if(e.target.id==="aiModal") hideModal("aiModal"); });
-  document.getElementById("aiSave").addEventListener("click",()=>{ setKey(document.getElementById("aiKeyInput").value.trim()); hideModal("aiModal"); toast("AI設定を保存しました"); });
-  document.getElementById("aiClear").addEventListener("click",()=>{ setKey(""); document.getElementById("aiKeyInput").value=""; toast("キーを削除しました"); });
-
-  document.getElementById("btnConn").addEventListener("click",()=>{ const c=getSupa()||{}; document.getElementById("supaUrl").value=c.url||""; document.getElementById("supaKey").value=c.key||""; showModal("supaModal"); });
-  document.getElementById("supaClose").addEventListener("click",()=>hideModal("supaModal"));
-  document.getElementById("supaModal").addEventListener("click",e=>{ if(e.target.id==="supaModal") hideModal("supaModal"); });
-  document.getElementById("supaClear").addEventListener("click",()=>{ setSupa(null); hideModal("supaModal"); setSyncState(); toast("接続を解除しました"); });
-  document.getElementById("supaSave").addEventListener("click",async()=>{
-    const url=document.getElementById("supaUrl").value.trim().replace(/\/+$/,""); const key=document.getElementById("supaKey").value.trim();
-    if(!url||!key){ toast("URLとキーを入力してください"); return; }
-    setSupa({url,key}); hideModal("supaModal"); setSyncState("loading");
-    try{ const peek=await fetch(supaBase()+"/rest/v1/pricing_records?select=id&limit=1",{headers:supaH()}); if(!peek.ok) throw new Error("接続"+peek.status);
-      const rows=await peek.json(); if(rows.length===0 && (products.length||suppliers.length||prices.length)) await supaPush();
-      await supaPull(); renderAll(); toast("接続しました。複数PCで同期されます"); }
-    catch(e){ setSyncState("err",e.message); toast("接続に失敗: "+e.message); } });
-
-  window.addEventListener("keydown",e=>{ if(e.key==="Escape"){ ["aiModal","supaModal","histModal"].forEach(hideModal); } });
-  window.addEventListener("resize",()=>setMobile(!!selProd));
-
-  /* boot */
-  if(!store.write(db)) document.getElementById("storageWarn").style.display="block";
-  renderBackupState(); renderAll(); setSyncState();
-  if(supaOn()){ supaPull().then(ok=>{ if(ok) renderAll(); }).catch(e=>setSyncState("err",e.message)); }
-  startAutoPull();
-})();
+/* ---------- boot ---------- */
+async function boot(){
+  loadConfig();initSupabase();fillCategorySelects();bind();
+  state.view=localStorage.getItem(LS.view)||"grid";
+  if(state.view==="list"){$("#viewList").classList.add("active");$("#viewGrid").classList.remove("active");}
+  state.products=await store.load();
+  if(!sb&&state.products.length===0){seedSample();state.products=await store.load();}
+  render();
+}
+boot();
 </script>
 </body>
 </html>
