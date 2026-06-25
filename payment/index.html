@@ -171,6 +171,23 @@
   .ex-warn{background:var(--over-bg);color:var(--over);border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:10px;}
   .ex-note{background:var(--unpaid-bg);color:var(--unpaid);border-radius:8px;padding:9px 12px;font-size:12.5px;margin-bottom:10px;font-weight:500;}
   .file-read{padding:6px 12px;}
+
+  /* payment line items */
+  .pitems{border:1px solid var(--line);border-radius:9px;overflow:hidden;}
+  .pi-row{display:grid;grid-template-columns:1fr 78px 110px 120px 30px;gap:8px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line-soft);}
+  .pi-row:last-child{border-bottom:none;}
+  .pi-head{background:var(--line-soft);font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;}
+  .pi-head .num{text-align:right;}
+  .pi-row input{border:1px solid transparent;border-radius:6px;padding:6px 8px;width:100%;background:transparent;}
+  .pi-row input:hover{border-color:var(--line);}
+  .pi-row input:focus{border-color:var(--accent);background:#fff;}
+  .pi-row input.num{text-align:right;font-family:"JetBrains Mono",monospace;font-weight:600;}
+  .pi-amt{text-align:right;font-family:"JetBrains Mono",monospace;font-weight:600;font-size:13px;color:var(--ink-soft);}
+  .pi-add button{background:#fff;border:1px dashed var(--line);border-radius:8px;padding:8px;width:100%;color:var(--accent);font-weight:600;font-size:13px;margin-top:8px;}
+  .pi-add button:hover{border-color:var(--accent);background:var(--line-soft);}
+  .pi-total{display:flex;justify-content:flex-end;align-items:center;gap:14px;margin-top:10px;}
+  .pi-total .lbl{font-size:12px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;}
+  .pi-total .val{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:16px;}
   @media(prefers-reduced-motion:reduce){*{transition:none!important;}}
 </style>
 </head>
@@ -421,6 +438,41 @@
   }
 
   /* ---------- detail ---------- */
+  function itemsSection(p){
+    const items=p.items||[];
+    let total=0;
+    const rows=items.map(it=>{ const amt=Number(it.qty||0)*Number(it.unitPrice||0); total+=amt; return payItemRow(it,amt); }).join("");
+    return `<div class="section">
+      <div class="section-bar"><h3>明細（商品・数量・単価）</h3>
+        <div class="mini-btns"><button class="btn-ghost" id="piApply">合計を金額に反映</button></div></div>
+      <p class="hint">請求書の明細（単価管理用）。金額＝数量×単価で自動計算します。</p>
+      <div class="pitems">
+        <div class="pi-row pi-head"><div>品名</div><div class="num">数量</div><div class="num">単価</div><div class="num">金額</div><div></div></div>
+        ${rows}
+      </div>
+      <div class="pi-add"><button id="piAdd">＋ 行を追加</button></div>
+      <div class="pi-total"><span class="lbl">明細合計</span><span class="val" id="piTotal">${fmtAmt(total)} ${esc(p.currency||"")}</span></div>
+    </div>`;
+  }
+  function payItemRow(it,amt){
+    return `<div class="pi-row" data-iid="${it.id}">
+      <input class="pi" data-ik="name" value="${esc(it.name)}" placeholder="品名">
+      <input class="pi num" data-ik="qty" inputmode="numeric" value="${esc(it.qty)}" placeholder="0">
+      <input class="pi num" data-ik="unitPrice" inputmode="decimal" value="${esc(it.unitPrice)}" placeholder="0">
+      <div class="pi-amt">${amt?fmtAmt(amt):"–"}</div>
+      <button class="row-del" data-idel="${it.id}" title="削除">×</button>
+    </div>`;
+  }
+  function recalcItems(p){
+    let total=0;
+    document.querySelectorAll("#detail .pitems .pi-row[data-iid]").forEach(row=>{
+      const it=(p.items||[]).find(x=>x.id===row.dataset.iid); if(!it) return;
+      const amt=Number(it.qty||0)*Number(it.unitPrice||0); total+=amt;
+      const c=row.querySelector(".pi-amt"); if(c) c.textContent=amt?fmtAmt(amt):"–";
+    });
+    const t=document.getElementById("piTotal"); if(t) t.textContent=fmtAmt(total)+" "+(p.currency||"");
+  }
+  function itemsTotal(p){ let t=0; (p.items||[]).forEach(it=>t+=Number(it.qty||0)*Number(it.unitPrice||0)); return t; }
   function detailHtml(p){
     const st=payStatus(p);
     const amtBig = p.amount?(fmtAmt(p.amount)+" "+esc(p.currency||"")):"金額 未入力";
@@ -451,6 +503,8 @@
         <div class="field"><label>支払予定日（期限）</label><input type="date" class="f" data-k="dueDate" value="${esc(p.dueDate)}"></div>
         <div class="field"><label>支払日（実績）</label><input type="date" class="f" data-k="paidDate" value="${esc(p.paidDate)}"></div>
       </div>
+
+      ${itemsSection(p)}
 
       <div class="section">
         <div class="section-bar"><h3>送金記録</h3></div>
@@ -520,7 +574,7 @@
 
   /* ---------- CRUD ---------- */
   function newPay(){
-    const p={id:uid(),supplier:"",refNo:"",status:"unpaid",amount:"",currency:"",dueDate:"",paidDate:"",method:"",remitAmount:"",remitDate:"",remitRef:"",note:"",attachments:[],updatedAt:Date.now()};
+    const p={id:uid(),supplier:"",refNo:"",status:"unpaid",amount:"",currency:"",dueDate:"",paidDate:"",method:"",remitAmount:"",remitDate:"",remitRef:"",items:[],note:"",attachments:[],updatedAt:Date.now()};
     payments.push(p); selId=p.id; save(); renderAll();
     const el=document.querySelector('#detail input[data-k="supplier"]'); if(el) el.focus();
   }
@@ -586,6 +640,7 @@ Schema:
   "paidDate": string|null,
   "method": string|null,
   "remitRef": string|null,
+  "items": [ { "name": string, "qty": number, "unitPrice": number } ],
   "warnings": [ string ]
 }
 
@@ -597,6 +652,7 @@ Rules:
 - dueDate / paidDate: normalise to YYYY-MM-DD. paidDate is the actual payment/transfer date if the document shows one.
 - method: payment method if shown (bank transfer / Wise / PayPal ...).
 - remitRef: transfer or transaction reference number.
+- items: ONLY from a commercial-invoice line-item table. Each entry is one product with its quantity and unit price. "qty" is the number of units; "unitPrice" is the price per unit (digits only, dot decimal, no separators or currency symbols). For remittance slips, receipts or bank statements, items must be [].
 - warnings: short notes on anything ambiguous, unclear, or guessed. Empty array if confident.
 - Use null for anything not present. Never invent values.`;
 
@@ -662,6 +718,17 @@ Rules:
       ${exF("送金方法","ex_method",v(r.method),p.method)}
       ${exF("送金参照番号","ex_remitRef",v(r.remitRef),p.remitRef)}
     </div>`;
+    const items=Array.isArray(r.items)?r.items:[];
+    if(items.length){
+      html+=`<div style="margin-top:16px;"><label style="font-size:11px;font-weight:600;color:#5b6b66;text-transform:uppercase;letter-spacing:.04em;">明細（チェックした行を取り込み）</label>`;
+      items.forEach(it=>{ html+=`<div class="ex-item" style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+        <input type="checkbox" checked style="width:16px;height:16px;">
+        <input type="text" value="${esc(it.name||'')}" placeholder="品名" style="flex:1;border:1px solid var(--line);border-radius:6px;padding:6px 8px;">
+        <input type="number" value="${esc(it.qty!=null?it.qty:'')}" placeholder="数量" style="width:74px;border:1px solid var(--line);border-radius:6px;padding:6px 8px;text-align:right;font-family:'JetBrains Mono',monospace;">
+        <input type="number" value="${esc(it.unitPrice!=null?it.unitPrice:'')}" placeholder="単価" style="width:100px;border:1px solid var(--line);border-radius:6px;padding:6px 8px;text-align:right;font-family:'JetBrains Mono',monospace;">
+      </div>`; });
+      html+=`<p style="font-size:12px;color:#8a948f;margin-top:8px;">反映後、明細下の「合計を金額に反映」で金額欄に合計を入れられます。</p></div>`;
+    }
     setExBody(html);
     setExFoot('<button class="btn-ghost" id="exCancel">キャンセル</button><button class="btn-primary" id="exApply">反映する</button>');
   }
@@ -670,7 +737,16 @@ Rules:
     const val=id=>{ const e=document.getElementById(id); return e?e.value.trim():""; };
     [["supplier","ex_supplier"],["refNo","ex_refNo"],["amount","ex_amount"],["currency","ex_currency"],["dueDate","ex_dueDate"],["paidDate","ex_paidDate"],["method","ex_method"],["remitRef","ex_remitRef"]]
       .forEach(([k,id])=>{ const x=val(id); if(x) p[k]=x; });
-    touch(p); save(); renderAll(); hideModal("extractModal"); toast("読み取り内容を反映しました");
+    const picked=[];
+    document.querySelectorAll("#exBody .ex-item").forEach(row=>{
+      const cb=row.querySelector('input[type="checkbox"]'); if(!cb||!cb.checked) return;
+      const t=row.querySelectorAll('input[type="text"],input[type="number"]');
+      const name=(t[0]&&t[0].value.trim())||""; const qty=(t[1]&&t[1].value.trim())||""; const unit=(t[2]&&t[2].value.trim())||"";
+      if(name||qty||unit) picked.push({id:uid(),name,qty,unitPrice:unit});
+    });
+    if(picked.length){ if(!p.items) p.items=[]; if(p.items.length===0) p.items=picked; else p.items=p.items.concat(picked); }
+    touch(p); save(); renderAll(); hideModal("extractModal");
+    toast("読み取り内容を反映しました"+(picked.length?("（明細"+picked.length+"件）"):""));
   }
 
   /* ---------- backup / restore ---------- */
@@ -714,10 +790,17 @@ Rules:
   document.getElementById("cards").addEventListener("click",e=>{ const c=e.target.closest(".card"); if(!c) return; selId=c.dataset.id; renderList(); renderDetail(); });
 
   document.getElementById("detail").addEventListener("input",e=>{
-    const p=cur(); if(!p||!e.target.classList.contains("f")) return;
+    const p=cur(); if(!p) return;
+    if(e.target.classList.contains("pi")){
+      const row=e.target.closest(".pi-row"); const it=(p.items||[]).find(x=>x.id===row.dataset.iid); if(!it) return;
+      it[e.target.dataset.ik]=e.target.value; touch(p); save(); recalcItems(p);
+      return;
+    }
+    if(!e.target.classList.contains("f")) return;
     const k=e.target.dataset.k;
     p[k]=e.target.value; touch(p); save();
     if(["supplier","refNo","amount","currency","dueDate","paidDate"].includes(k)){ renderList(); renderChips(); renderOutstanding(); }
+    if(k==="currency") recalcItems(p);
   });
   document.getElementById("detail").addEventListener("change",e=>{
     if(e.target.classList.contains("file-input")){ handleFiles(e.target.files); e.target.value=""; return; }
@@ -728,6 +811,9 @@ Rules:
   });
   document.getElementById("detail").addEventListener("click",e=>{
     if(e.target.id==="btnDel") return delPay();
+    if(e.target.id==="piAdd"){ const p=cur(); if(!p) return; if(!p.items)p.items=[]; p.items.push({id:uid(),name:"",qty:"",unitPrice:""}); touch(p); save(); renderDetail(); return; }
+    if(e.target.id==="piApply"){ const p=cur(); if(!p) return; p.amount=String(itemsTotal(p)); touch(p); save(); renderDetail(); renderList(); renderOutstanding(); toast("明細合計を金額に反映しました"); return; }
+    if(e.target.dataset.idel){ const p=cur(); if(!p) return; p.items=(p.items||[]).filter(x=>x.id!==e.target.dataset.idel); touch(p); save(); renderDetail(); return; }
     if(e.target.dataset.addfile!==undefined){ const inp=e.currentTarget.querySelector(".file-input"); if(inp) inp.click(); return; }
     if(e.target.dataset.fread) return startExtract(e.target.dataset.fread);
     if(e.target.dataset.fopen) return openFile(e.target.dataset.fopen);
